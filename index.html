@@ -27,8 +27,8 @@
   </div>
 
   <script>
-    // 👉 Yaha apna Apps Script Web App ka URL daalna
-    const scriptURL = "https://script.google.com/macros/s/AKfycbx8QsoA301p5tm8qEHC1ln15Eh8vWRAC7Z5o8_Ef0jvdoaqm4wI-ZmpBNTIIOJTMS21/exec";
+    // 👉 Apna Apps Script URL yaha daalna
+    const scriptURL = "https://script.google.com/macros/s/AKfycbw17MFvtyVLF2qEZgTp6svTzJ8wuJ2iy297lDh-BKxsPcYYbUWfE28P79tV9CnEQilK/exec";
 
     document.getElementById("dataForm").addEventListener("submit", function(e){
       e.preventDefault();
@@ -37,14 +37,22 @@
 
       fetch(scriptURL, {
         method: "POST",
+        mode: "cors",
+        headers: {
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify(data)
       })
       .then(res => res.json())
       .then(response => {
-        alert("✅ Data submitted successfully!");
-        this.reset();
+        if (response.result === "success") {
+          alert("✅ Data submitted successfully!");
+          this.reset();
+        } else {
+          alert("❌ Error: " + response.message);
+        }
       })
-      .catch(err => alert("❌ Error: " + err));
+      .catch(err => alert("❌ Fetch error: " + err));
     });
   </script>
 </body>
