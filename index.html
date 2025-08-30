@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expense Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div class="bg-white shadow-lg rounded-2xl p-8 w-full max-w-2xl">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Expense Entry</h2>
+    
+    <form id="dataForm" class="grid grid-cols-2 gap-4">
+      <input type="date" name="date" required class="px-3 py-2 border rounded-lg col-span-2">
+      <input type="text" name="credit" placeholder="Credit" class="px-3 py-2 border rounded-lg">
+      <input type="text" name="debit" placeholder="Debit" class="px-3 py-2 border rounded-lg">
+      <input type="text" name="product" placeholder="Product" class="px-3 py-2 border rounded-lg">
+      <input type="text" name="for" placeholder="For" class="px-3 py-2 border rounded-lg">
+      <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 border rounded-lg">
+      <input type="text" name="by" placeholder="By" class="px-3 py-2 border rounded-lg">
+      <input type="text" name="from" placeholder="From" class="px-3 py-2 border rounded-lg">
+
+      <button type="submit" class="col-span-2 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
+        Submit
+      </button>
+    </form>
+  </div>
+
+  <script>
+    // 👉 Yaha apna Apps Script Web App ka URL daalna
+    const scriptURL = "PASTE_YOUR_SCRIPT_URL_HERE";
+
+    document.getElementById("dataForm").addEventListener("submit", function(e){
+      e.preventDefault();
+      const formData = new FormData(this);
+      const data = Object.fromEntries(formData.entries());
+
+      fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify(data)
+      })
+      .then(res => res.json())
+      .then(response => {
+        alert("✅ Data submitted successfully!");
+        this.reset();
+      })
+      .catch(err => alert("❌ Error: " + err));
+    });
+  </script>
+</body>
+</html>
