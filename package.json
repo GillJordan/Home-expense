@@ -1,0 +1,9 @@
+{
+  "name": "expense-tracker",
+  "version": "1.0.0",
+  "description": "Expense Tracker with Netlify + Google Sheets",
+  "main": "index.js",
+  "dependencies": {
+    "googleapis": "^118.0.0"
+  }
+}
