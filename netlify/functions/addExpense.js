@@ -2,8 +2,6 @@ const { google } = require("googleapis");
 
 exports.handler = async (event, context) => {
   try {
-    console.log("👉 Incoming Event Body:", event.body);
-
     const body = JSON.parse(event.body);
 
     const auth = new google.auth.GoogleAuth({
@@ -13,34 +11,42 @@ exports.handler = async (event, context) => {
 
     const sheets = google.sheets({ version: "v4", auth });
     const sheetId = process.env.SHEET_ID;
-    const sheetName = "2025"; // 👈 apna sheet ka naam yaha fix kar (year wise)
+    const sheetName = "2025"; // 👈 apne year ke hisaab se sheet ka naam
 
-    // 🔹 Get last used row number
+    // Get last used row
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
       range: `${sheetName}!A:A`
     });
-
     const numRows = response.data.values ? response.data.values.length : 0;
     const nextRow = numRows + 1;
 
-    console.log("👉 Writing at row:", nextRow);
+    // Day calculate from date
+    const dayName = new Date(body.date).toLocaleDateString("en-US", { weekday: "long" });
 
-    // 🔹 Write data to next row
+    // Insert row according to column mapping
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
       range: `${sheetName}!A${nextRow}`,
       valueInputOption: "RAW",
       resource: {
         values: [[
-          body.date, body.credit, body.debit, body.product,
-          body.for, body.quantity, body.by, body.from,
-          new Date().toISOString()
+          dayName,          // A → Day
+          body.date,        // B → Date
+          "",               // C → Credit (empty)
+          "",               // D → Left Balance (empty)
+          body.debit,       // E → Debit
+          body.product,     // F → Product
+          body.for,         // G → For
+          body.quantity,    // H → Quantity
+          body.by,          // I → By
+          body.from,        // J → From
+          "",               // K → Extra Spent (formula)
+          "",               // L → Daily Limit (formula)
+          ""                // M → Remaining Limit (formula)
         ]]
       }
     });
-
-    console.log("✅ Data Added Successfully");
 
     return {
       statusCode: 200,
@@ -48,7 +54,6 @@ exports.handler = async (event, context) => {
     };
 
   } catch (err) {
-    console.error("❌ Error in addExpense:", err);
     return {
       statusCode: 500,
       body: JSON.stringify({ result: "error", message: err.message })
