@@ -21,8 +21,18 @@ exports.handler = async (event, context) => {
     const numRows = response.data.values ? response.data.values.length : 0;
     const nextRow = numRows + 1;
 
-    // Day calculate from date
+    // Day calculate
     const dayName = new Date(body.date).toLocaleDateString("en-US", { weekday: "long" });
+
+    // Date format "01-September-2025"
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      const day = String(d.getDate()).padStart(2, "0");
+      const month = d.toLocaleString("en-US", { month: "long" });
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+    const formattedDate = formatDate(body.date);
 
     // Insert row according to column mapping
     await sheets.spreadsheets.values.update({
@@ -32,7 +42,7 @@ exports.handler = async (event, context) => {
       resource: {
         values: [[
           dayName,          // A → Day
-          body.date,        // B → Date
+          formattedDate,    // B → Date (01-September-2025)
           "",               // C → Credit (empty)
           "",               // D → Left Balance (empty)
           body.debit,       // E → Debit
