@@ -2,19 +2,34 @@ const { google } = require("googleapis");
 
 exports.handler = async (event, context) => {
   try {
+    console.log("👉 Incoming Event Body:", event.body);
+
     const body = JSON.parse(event.body);
 
     const auth = new google.auth.GoogleAuth({
-      credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS), // Service Account JSON
+      credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
       scopes: ["https://www.googleapis.com/auth/spreadsheets"]
     });
 
     const sheets = google.sheets({ version: "v4", auth });
-    const sheetId = process.env.SHEET_ID; // Google Sheet ID
+    const sheetId = process.env.SHEET_ID;
+    const sheetName = "2025"; // 👈 apna sheet ka naam yaha fix kar (year wise)
 
-    await sheets.spreadsheets.values.append({
+    // 🔹 Get last used row number
+    const response = await sheets.spreadsheets.values.get({
       spreadsheetId: sheetId,
-      range: "2025!A1",
+      range: `${sheetName}!A:A`
+    });
+
+    const numRows = response.data.values ? response.data.values.length : 0;
+    const nextRow = numRows + 1;
+
+    console.log("👉 Writing at row:", nextRow);
+
+    // 🔹 Write data to next row
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!A${nextRow}`,
       valueInputOption: "RAW",
       resource: {
         values: [[
@@ -25,11 +40,15 @@ exports.handler = async (event, context) => {
       }
     });
 
+    console.log("✅ Data Added Successfully");
+
     return {
       statusCode: 200,
-      body: JSON.stringify({ result: "success", data: body })
+      body: JSON.stringify({ result: "success", row: nextRow, data: body })
     };
+
   } catch (err) {
+    console.error("❌ Error in addExpense:", err);
     return {
       statusCode: 500,
       body: JSON.stringify({ result: "error", message: err.message })
