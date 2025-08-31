@@ -25,6 +25,80 @@
     </form>
   </div>
 
-  <script src="script.js"></script>
+  <script>
+    const scriptURL = "/.netlify/functions/addExpense";
+
+    // 🔹 Save data offline if net is not available
+    function saveOffline(data) {
+      let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
+      pending.push(data);
+      localStorage.setItem("pendingEntries", JSON.stringify(pending));
+      alert("📌 Internet nahi hai, data offline save ho gaya. Net aate hi sync ho jaayega.");
+    }
+
+    // 🔹 Sync pending data when online
+    async function syncOfflineData() {
+      let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
+      if (pending.length === 0) return;
+
+      for (let i = 0; i < pending.length; i++) {
+        try {
+          const res = await fetch(scriptURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(pending[i])
+          });
+          const result = await res.json();
+
+          if (result.result === "success") {
+            console.log("✅ Synced:", pending[i]);
+            pending.splice(i, 1);
+            i--;
+          }
+        } catch (err) {
+          console.warn("❌ Sync failed, retry later:", err);
+          break;
+        }
+      }
+
+      localStorage.setItem("pendingEntries", JSON.stringify(pending));
+    }
+
+    // 🔹 Form submit
+    document.getElementById("dataForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const data = Object.fromEntries(formData.entries());
+
+      try {
+        const res = await fetch(scriptURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        const result = await res.json();
+
+        if (result.result === "success") {
+          alert("✅ Data submitted successfully!");
+          this.reset();
+        } else {
+          throw new Error(result.message);
+        }
+      } catch (err) {
+        saveOffline(data);
+      }
+    });
+
+    // 🔹 Auto sync on reconnect
+    window.addEventListener("online", syncOfflineData);
+    window.addEventListener("load", syncOfflineData);
+
+    // 🔹 Register Service Worker for offline page access
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/service-worker.js")
+        .then(() => console.log("✅ Service Worker Registered"))
+        .catch(err => console.error("❌ SW registration failed:", err));
+    }
+  </script>
 </body>
 </html>
