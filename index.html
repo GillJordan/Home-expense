@@ -16,7 +16,7 @@
       position: relative;
       border-radius: 1rem;
       overflow: hidden;
-      padding: 2px; /* border thickness */
+      padding: 2px;
     }
 
     .rgb-border::before {
@@ -33,15 +33,15 @@
     .rgb-border::after {
       content: "";
       position: absolute;
-      inset: 4px; /* inner gap */
-      background: #111; /* inner dark box */
+      inset: 4px;
+      background: #111;
       border-radius: 0.75rem;
       z-index: 1;
     }
 
     .content {
       position: relative;
-      z-index: 2; /* keep form above */
+      z-index: 2;
     }
 
     @keyframes spin {
@@ -77,13 +77,25 @@
       <h2 class="text-2xl font-bold text-center mb-6">Expense Entry</h2>
       
       <form id="dataForm" class="grid grid-cols-2 gap-4">
-        <input type="date" name="date" required class="px-3 py-2 rounded-lg col-span-2">
+        <!-- Date with auto current date -->
+        <input type="date" id="dateInput" name="date" required class="px-3 py-2 rounded-lg col-span-2">
+
         <input type="text" name="debit" placeholder="Debit" required class="px-3 py-2 rounded-lg">
-        <input type="text" name="product" placeholder="Product" required class="px-3 py-2 rounded-lg">
-        <input type="text" name="for" placeholder="For" required class="px-3 py-2 rounded-lg">
+
+        <!-- Autocomplete fields with datalist -->
+        <input type="text" name="product" list="productList" placeholder="Product" required class="px-3 py-2 rounded-lg">
+        <datalist id="productList"></datalist>
+
+        <input type="text" name="for" list="forList" placeholder="For" required class="px-3 py-2 rounded-lg">
+        <datalist id="forList"></datalist>
+
         <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 rounded-lg">
-        <input type="text" name="by" placeholder="By" class="px-3 py-2 rounded-lg">
-        <input type="text" name="from" placeholder="From" class="px-3 py-2 rounded-lg col-span-2">
+
+        <input type="text" name="by" list="byList" placeholder="By" class="px-3 py-2 rounded-lg">
+        <datalist id="byList"></datalist>
+
+        <input type="text" name="from" list="fromList" placeholder="From" class="px-3 py-2 rounded-lg col-span-2">
+        <datalist id="fromList"></datalist>
 
         <button type="submit" class="col-span-2 py-2 rounded-lg">
           Submit
@@ -104,6 +116,52 @@
         })
         .catch(err => console.error("❌ SW registration failed:", err));
     }
+
+    // 🔹 Set current date automatically in date input
+    window.addEventListener("load", () => {
+      const today = new Date().toISOString().split("T")[0];
+      document.getElementById("dateInput").value = today;
+    });
+
+    // 🔹 Manage autocomplete suggestions
+    function saveSuggestion(field, value) {
+      if (!value) return;
+      let key = field + "Suggestions";
+      let suggestions = JSON.parse(localStorage.getItem(key)) || [];
+      if (!suggestions.includes(value)) {
+        suggestions.push(value);
+        localStorage.setItem(key, JSON.stringify(suggestions));
+      }
+    }
+
+    function loadSuggestions(field, datalistId) {
+      let key = field + "Suggestions";
+      let suggestions = JSON.parse(localStorage.getItem(key)) || [];
+      let datalist = document.getElementById(datalistId);
+      datalist.innerHTML = "";
+      suggestions.forEach(item => {
+        let option = document.createElement("option");
+        option.value = item;
+        datalist.appendChild(option);
+      });
+    }
+
+    // Load suggestions on page load
+    window.addEventListener("load", () => {
+      loadSuggestions("product", "productList");
+      loadSuggestions("for", "forList");
+      loadSuggestions("by", "byList");
+      loadSuggestions("from", "fromList");
+    });
+
+    // On form submit → save new suggestions
+    document.getElementById("dataForm").addEventListener("submit", () => {
+      const form = document.getElementById("dataForm");
+      saveSuggestion("product", form.product.value);
+      saveSuggestion("for", form.for.value);
+      saveSuggestion("by", form.by.value);
+      saveSuggestion("from", form.from.value);
+    });
   </script>
 </body>
 </html>
