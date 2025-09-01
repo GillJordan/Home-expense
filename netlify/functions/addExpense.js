@@ -8,14 +8,14 @@ exports.handler = async (event, context) => {
     });
 
     const sheets = google.sheets({ version: "v4", auth });
-
     const spreadsheetId = process.env.SHEET_ID;
 
-    // ✅ Search request
+    // ✅ Search
     if (event.httpMethod === "GET" && event.queryStringParameters.search) {
       const searchTerm = event.queryStringParameters.search.toLowerCase();
+      const startDate = event.queryStringParameters.startDate ? new Date(event.queryStringParameters.startDate) : null;
+      const endDate = event.queryStringParameters.endDate ? new Date(event.queryStringParameters.endDate) : null;
 
-      // ✅ Loop all sheets (year-wise)
       const meta = await sheets.spreadsheets.get({ spreadsheetId });
       let allRows = [];
 
@@ -27,9 +27,20 @@ exports.handler = async (event, context) => {
         });
 
         const rows = read.data.values || [];
-        const filtered = rows.filter(
-          (row) => row[5] && row[5].toLowerCase().includes(searchTerm)
-        );
+        const filtered = rows.filter((row, index) => {
+          if (index === 0) return false; // skip header
+          const product = row[5] ? row[5].toLowerCase() : "";
+          if (!product.includes(searchTerm)) return false;
+
+          if (startDate || endDate) {
+            const rowDate = new Date(row[1]); // "Date" column
+            if (startDate && rowDate < startDate) return false;
+            if (endDate && rowDate > endDate) return false;
+          }
+
+          return true;
+        });
+
         allRows = allRows.concat(filtered);
       }
 
@@ -39,7 +50,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ Insert request
+    // ✅ Insert
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body);
       const dateObj = new Date(body.date);
@@ -53,13 +64,7 @@ exports.handler = async (event, context) => {
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
           requestBody: {
-            requests: [
-              {
-                addSheet: {
-                  properties: { title: year },
-                },
-              },
-            ],
+            requests: [{ addSheet: { properties: { title: year } } }],
           },
         });
 
@@ -68,28 +73,15 @@ exports.handler = async (event, context) => {
           range: `${year}!A1:M1`,
           valueInputOption: "RAW",
           requestBody: {
-            values: [
-              [
-                "Day",
-                "Date",
-                "Credit",
-                "Left Balance",
-                "Debit",
-                "Product",
-                "For",
-                "Quantity",
-                "By",
-                "From",
-                "Extra Spent",
-                "Daily Limit",
-                "Remaining Limit",
-              ],
-            ],
+            values: [[
+              "Day","Date","Credit","Left Balance","Debit",
+              "Product","For","Quantity","By","From",
+              "Extra Spent","Daily Limit","Remaining Limit"
+            ]],
           },
         });
       }
 
-      // ✅ Insert data
       const day = dateObj.toLocaleDateString("en-US", { weekday: "long" });
 
       await sheets.spreadsheets.values.append({
@@ -97,23 +89,21 @@ exports.handler = async (event, context) => {
         range: `${year}!A:M`,
         valueInputOption: "RAW",
         requestBody: {
-          values: [
-            [
-              day,
-              body.date,
-              "",
-              "",
-              body.debit,
-              body.product,
-              body.for,
-              body.quantity,
-              body.by,
-              body.from,
-              "",
-              "",
-              "",
-            ],
-          ],
+          values: [[
+            day,
+            body.date,
+            "",
+            "",
+            body.debit,
+            body.product,
+            body.for,
+            body.quantity,
+            body.by,
+            body.from,
+            "",
+            "",
+            ""
+          ]],
         },
       });
 
