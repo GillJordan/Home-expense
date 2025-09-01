@@ -1,27 +1,27 @@
-const CACHE_NAME = "expense-tracker-cache"; // fixed name
+// Dynamic cache name with timestamp for auto update
+const CACHE_NAME = "expense-tracker-cache-" + new Date().getTime();
+
 const FILES_TO_CACHE = [
   "/",
   "/index.html",
-  "/style.css?v=1",
-  "/script.js?v=1"
+  "/style.css",
+  "/script.js"
 ];
 
-// Install → cache fresh files
+// Install → cache new files
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(FILES_TO_CACHE);
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(FILES_TO_CACHE))
   );
-  self.skipWaiting(); // new worker activate immediately
+  self.skipWaiting(); // activate immediately
 });
 
-// Activate → remove old caches
+// Activate → delete old caches
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keyList =>
+    caches.keys().then(keys =>
       Promise.all(
-        keyList.map(key => {
+        keys.map(key => {
           if (key !== CACHE_NAME) {
             return caches.delete(key);
           }
@@ -32,15 +32,13 @@ self.addEventListener("activate", event => {
   self.clients.claim();
 });
 
-// Fetch → try network first, fallback cache
+// Fetch → network first, fallback cache
 self.addEventListener("fetch", event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        const resClone = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, resClone);
-        });
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         return response;
       })
       .catch(() => caches.match(event.request))
