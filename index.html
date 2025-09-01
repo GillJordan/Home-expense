@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Expense Entry</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="style.css?v=1"> <!-- version query added -->
   <style>
     body {
       background-color: #000; /* Black background */
@@ -68,13 +67,16 @@
     </form>
   </div>
 
-  <script src="script.js?v=1"></script> <!-- version query added -->
+  <script src="script.js"></script>
 
   <!-- Service Worker Register -->
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/service-worker.js")
-        .then(() => console.log("✅ Service Worker Registered"))
+        .then(reg => {
+          reg.update(); // 👈 force update check every load
+          console.log("✅ Service Worker Registered & Updated");
+        })
         .catch(err => console.error("❌ SW registration failed:", err));
     }
   </script>
