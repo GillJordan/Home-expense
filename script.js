@@ -1,5 +1,46 @@
 const scriptURL = "/.netlify/functions/addExpense";
 
+// 🔹 Fetch suggestions from Google Sheet
+async function fetchSuggestions() {
+  try {
+    const res = await fetch(`${scriptURL}?suggestions=true`);
+    const result = await res.json();
+
+    if (result.result === "success") {
+      const rows = result.data;
+
+      const productList = new Set();
+      const forList = new Set();
+      const byList = new Set();
+      const fromList = new Set();
+
+      rows.forEach(row => {
+        if (row[0]) productList.add(row[0]);
+        if (row[1]) forList.add(row[1]);
+        if (row[2]) byList.add(row[2]);
+        if (row[3]) fromList.add(row[3]);
+      });
+
+      loadSuggestionsFromSet(productList, "productList");
+      loadSuggestionsFromSet(forList, "forList");
+      loadSuggestionsFromSet(byList, "byList");
+      loadSuggestionsFromSet(fromList, "fromList");
+    }
+  } catch (err) {
+    console.error("❌ Suggestion fetch error:", err);
+  }
+}
+
+function loadSuggestionsFromSet(set, datalistId) {
+  let datalist = document.getElementById(datalistId);
+  datalist.innerHTML = "";
+  set.forEach(item => {
+    let option = document.createElement("option");
+    option.value = item;
+    datalist.appendChild(option);
+  });
+}
+
 // 🔹 Save data offline if net not available
 function saveOffline(data) {
   let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
@@ -15,7 +56,7 @@ function saveEntryLocal(data) {
   localStorage.setItem("allEntries", JSON.stringify(all));
 }
 
-// 🔹 Sync pending data when online
+// 🔹 Sync pending data
 async function syncOfflineData() {
   let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
   if (pending.length === 0) return;
@@ -31,7 +72,7 @@ async function syncOfflineData() {
 
       if (result.result === "success") {
         console.log("✅ Synced:", pending[i]);
-        saveEntryLocal(pending[i]); // also save in allEntries
+        saveEntryLocal(pending[i]);
         pending.splice(i, 1);
         i--;
       }
@@ -44,31 +85,7 @@ async function syncOfflineData() {
   localStorage.setItem("pendingEntries", JSON.stringify(pending));
 }
 
-// 🔹 Save autocomplete suggestions
-function saveSuggestion(field, value) {
-  if (!value) return;
-  let key = field + "Suggestions";
-  let suggestions = JSON.parse(localStorage.getItem(key)) || [];
-  if (!suggestions.includes(value)) {
-    suggestions.push(value);
-    localStorage.setItem(key, JSON.stringify(suggestions));
-  }
-}
-
-// 🔹 Load autocomplete suggestions
-function loadSuggestions(field, datalistId) {
-  let key = field + "Suggestions";
-  let suggestions = JSON.parse(localStorage.getItem(key)) || [];
-  let datalist = document.getElementById(datalistId);
-  datalist.innerHTML = "";
-  suggestions.forEach(item => {
-    let option = document.createElement("option");
-    option.value = item;
-    datalist.appendChild(option);
-  });
-}
-
-// 🔹 Form submit handler
+// 🔹 Form submit
 document.getElementById("dataForm").addEventListener("submit", async function (e) {
   e.preventDefault();
   const formData = new FormData(this);
@@ -85,21 +102,8 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
     if (result.result === "success") {
       alert("✅ Data submitted successfully!");
       this.reset();
-
-      // save new suggestions
-      saveSuggestion("product", data.product);
-      saveSuggestion("for", data.for);
-      saveSuggestion("by", data.by);
-      saveSuggestion("from", data.from);
-
-      // reload suggestions
-      loadSuggestions("product", "productList");
-      loadSuggestions("for", "forList");
-      loadSuggestions("by", "byList");
-      loadSuggestions("from", "fromList");
-
-      // save entry locally for offline search
       saveEntryLocal(data);
+      await fetchSuggestions(); // refresh suggestions live
     } else {
       throw new Error(result.message);
     }
@@ -107,6 +111,27 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
     saveOffline(data);
   }
 });
+
+// 🔹 Search
+async function searchProduct() {
+  const query = document.getElementById("searchInput").value.trim().toLowerCase();
+  if (!query) return alert("Please enter a product name!");
+
+  if (!navigator.onLine) {
+    let all = JSON.parse(localStorage.getItem("allEntries")) || [];
+    let filtered = all.filter(entry => entry.product && entry.product.toLowerCase().includes(query));
+    return showResults(filtered);
+  }
+
+  try {
+    const res = await fetch(`${scriptURL}?search=${encodeURIComponent(query)}`);
+    const result = await res.json();
+    showResults(result.data || []);
+  } catch (err) {
+    console.error("❌ Search error:", err);
+    alert("Error fetching search results!");
+  }
+}
 
 // 🔹 Show search results
 function showResults(data) {
@@ -146,43 +171,13 @@ function showResults(data) {
   document.getElementById("searchResults").innerHTML = html;
 }
 
-// 🔹 Search product (online + offline)
-async function searchProduct() {
-  const query = document.getElementById("searchInput").value.trim().toLowerCase();
-  if (!query) return alert("Please enter a product name!");
-
-  if (!navigator.onLine) {
-    // Offline search
-    let all = JSON.parse(localStorage.getItem("allEntries")) || [];
-    let filtered = all.filter(entry => entry.product && entry.product.toLowerCase().includes(query));
-    return showResults(filtered);
-  }
-
-  // Online search
-  try {
-    const res = await fetch(`${scriptURL}?search=${encodeURIComponent(query)}`);
-    const result = await res.json();
-    showResults(result.data || []);
-  } catch (err) {
-    console.error("❌ Search error:", err);
-    alert("Error fetching search results!");
-  }
-}
-
 // 🔹 Load on startup
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
   syncOfflineData();
+  await fetchSuggestions();
 
-  // load suggestions
-  loadSuggestions("product", "productList");
-  loadSuggestions("for", "forList");
-  loadSuggestions("by", "byList");
-  loadSuggestions("from", "fromList");
-
-  // set current date
   const today = new Date().toISOString().split("T")[0];
   document.getElementById("dateInput").value = today;
 });
 
-// 🔹 Auto sync when back online
 window.addEventListener("online", syncOfflineData);
