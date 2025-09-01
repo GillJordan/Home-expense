@@ -9,12 +9,13 @@ exports.handler = async (event, context) => {
 
     const sheets = google.sheets({ version: "v4", auth });
     const sheetId = process.env.SHEET_ID;
-    const sheetName = "2025"; // 👈 apne year-wise sheet ka naam
 
     /* ----------------------
        ✅ Get Suggestions
     ---------------------- */
     if (event.httpMethod === "GET" && event.queryStringParameters.suggestions) {
+      const sheetName = event.queryStringParameters.sheet || new Date().getFullYear().toString();
+
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
         range: `${sheetName}!A:M`
@@ -53,7 +54,9 @@ exports.handler = async (event, context) => {
        ✅ Search by Product
     ---------------------- */
     if (event.httpMethod === "GET" && event.queryStringParameters.search) {
+      const sheetName = event.queryStringParameters.sheet || new Date().getFullYear().toString();
       const query = event.queryStringParameters.search.toLowerCase();
+
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
         range: `${sheetName}!A:M`
@@ -76,6 +79,7 @@ exports.handler = async (event, context) => {
     ---------------------- */
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body);
+      const sheetName = body.sheetName || new Date().getFullYear().toString();
 
       // Get last row
       const response = await sheets.spreadsheets.values.get({
