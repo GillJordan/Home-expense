@@ -5,30 +5,81 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Expense Entry</title>
   <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-  <div class="bg-white shadow-lg rounded-2xl p-8 w-full max-w-2xl">
-    <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Expense Entry</h2>
-    
-    <form id="dataForm" class="grid grid-cols-2 gap-4">
-      <input type="date" name="date" required class="px-3 py-2 border rounded-lg col-span-2">
-      <input type="text" name="debit" placeholder="Debit" required class="px-3 py-2 border rounded-lg">
-      <input type="text" name="product" placeholder="Product" required class="px-3 py-2 border rounded-lg">
-      <input type="text" name="for" placeholder="For" required class="px-3 py-2 border rounded-lg">
-      <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 border rounded-lg">
-      <input type="text" name="by" placeholder="By" class="px-3 py-2 border rounded-lg">
-      <input type="text" name="from" placeholder="From" class="px-3 py-2 border rounded-lg col-span-2">
+  <style>
+    body {
+      background-color: #0d0d0d; /* Blackish background */
+    }
 
-      <button type="submit" class="col-span-2 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
-        Submit
-      </button>
-    </form>
+    /* 🔹 RGB Border Animation */
+    .rgb-border {
+      position: relative;
+      border-radius: 1rem; /* rounded-xl */
+      padding: 2px; /* border thickness */
+      background: linear-gradient(45deg,
+        red, orange, yellow, green, cyan, blue, violet, red);
+      background-size: 400% 400%;
+      animation: rgbAnim 8s linear infinite;
+    }
+
+    @keyframes rgbAnim {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .rgb-border .content {
+      background: #1a1a1a; /* Dark inner box */
+      border-radius: 0.75rem; /* rounded-lg */
+      padding: 2rem;
+    }
+
+    input, button {
+      background: #262626;
+      color: #fff;
+      border: 1px solid #444;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: cyan;
+      background: #333;
+    }
+
+    button {
+      background: linear-gradient(90deg, #ff00cc, #3333ff);
+      color: white;
+      font-weight: bold;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+  <div class="rgb-border w-full max-w-2xl">
+    <div class="content">
+      <h2 class="text-2xl font-bold text-white mb-6 text-center">Expense Entry</h2>
+      
+      <form id="dataForm" class="grid grid-cols-2 gap-4">
+        <input type="date" name="date" required class="px-3 py-2 rounded-lg col-span-2">
+        <input type="text" name="debit" placeholder="Debit" required class="px-3 py-2 rounded-lg">
+        <input type="text" name="product" placeholder="Product" required class="px-3 py-2 rounded-lg">
+        <input type="text" name="for" placeholder="For" required class="px-3 py-2 rounded-lg">
+        <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 rounded-lg">
+        <input type="text" name="by" placeholder="By" class="px-3 py-2 rounded-lg">
+        <input type="text" name="from" placeholder="From" class="px-3 py-2 rounded-lg col-span-2">
+
+        <button type="submit" class="col-span-2 py-2 rounded-lg">
+          Submit
+        </button>
+      </form>
+    </div>
   </div>
 
   <script>
     const scriptURL = "/.netlify/functions/addExpense";
 
-    // 🔹 Save data offline if net is not available
     function saveOffline(data) {
       let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
       pending.push(data);
@@ -36,7 +87,6 @@
       alert("📌 Internet nahi hai, data offline save ho gaya. Net aate hi sync ho jaayega.");
     }
 
-    // 🔹 Sync pending data when online
     async function syncOfflineData() {
       let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
       if (pending.length === 0) return;
@@ -64,7 +114,6 @@
       localStorage.setItem("pendingEntries", JSON.stringify(pending));
     }
 
-    // 🔹 Form submit
     document.getElementById("dataForm").addEventListener("submit", async function (e) {
       e.preventDefault();
       const formData = new FormData(this);
@@ -89,11 +138,9 @@
       }
     });
 
-    // 🔹 Auto sync on reconnect
     window.addEventListener("online", syncOfflineData);
     window.addEventListener("load", syncOfflineData);
 
-    // 🔹 Register Service Worker for offline page access
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/service-worker.js")
         .then(() => console.log("✅ Service Worker Registered"))
