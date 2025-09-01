@@ -1,6 +1,10 @@
 const scriptURL = "/.netlify/functions/addExpense";
 
-// 🔹 Fetch suggestions from Google Sheet
+/* ---------------------------
+   🔹 Suggestions Handling
+--------------------------- */
+
+// Fetch suggestions from Google Sheet
 async function fetchSuggestions() {
   try {
     const res = await fetch(`${scriptURL}?suggestions=true`);
@@ -21,14 +25,40 @@ async function fetchSuggestions() {
         if (row[3]) fromList.add(row[3]);
       });
 
+      // Load into UI
       loadSuggestionsFromSet(productList, "productList");
       loadSuggestionsFromSet(forList, "forList");
       loadSuggestionsFromSet(byList, "byList");
       loadSuggestionsFromSet(fromList, "fromList");
+
+      // ✅ Save into LocalStorage for offline use
+      localStorage.setItem("productSuggestions", JSON.stringify([...productList]));
+      localStorage.setItem("forSuggestions", JSON.stringify([...forList]));
+      localStorage.setItem("bySuggestions", JSON.stringify([...byList]));
+      localStorage.setItem("fromSuggestions", JSON.stringify([...fromList]));
     }
   } catch (err) {
     console.error("❌ Suggestion fetch error:", err);
   }
+}
+
+// Load suggestions from LocalStorage (offline mode)
+function loadSuggestionsFromLocal() {
+  loadSuggestionsFromKey("productSuggestions", "productList");
+  loadSuggestionsFromKey("forSuggestions", "forList");
+  loadSuggestionsFromKey("bySuggestions", "byList");
+  loadSuggestionsFromKey("fromSuggestions", "fromList");
+}
+
+function loadSuggestionsFromKey(key, datalistId) {
+  let suggestions = JSON.parse(localStorage.getItem(key)) || [];
+  let datalist = document.getElementById(datalistId);
+  datalist.innerHTML = "";
+  suggestions.forEach(item => {
+    let option = document.createElement("option");
+    option.value = item;
+    datalist.appendChild(option);
+  });
 }
 
 function loadSuggestionsFromSet(set, datalistId) {
@@ -41,7 +71,10 @@ function loadSuggestionsFromSet(set, datalistId) {
   });
 }
 
-// 🔹 Save data offline if net not available
+/* ---------------------------
+   🔹 Offline Save & Sync
+--------------------------- */
+
 function saveOffline(data) {
   let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
   pending.push(data);
@@ -49,14 +82,12 @@ function saveOffline(data) {
   alert("📌 Internet nahi hai, data offline save ho gaya. Net aate hi sync ho jaayega.");
 }
 
-// 🔹 Save full entry for offline search
 function saveEntryLocal(data) {
   let all = JSON.parse(localStorage.getItem("allEntries")) || [];
   all.push(data);
   localStorage.setItem("allEntries", JSON.stringify(all));
 }
 
-// 🔹 Sync pending data
 async function syncOfflineData() {
   let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
   if (pending.length === 0) return;
@@ -85,7 +116,10 @@ async function syncOfflineData() {
   localStorage.setItem("pendingEntries", JSON.stringify(pending));
 }
 
-// 🔹 Form submit
+/* ---------------------------
+   🔹 Form Submit
+--------------------------- */
+
 document.getElementById("dataForm").addEventListener("submit", async function (e) {
   e.preventDefault();
   const formData = new FormData(this);
@@ -112,7 +146,10 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
   }
 });
 
-// 🔹 Search
+/* ---------------------------
+   🔹 Search (Online + Offline)
+--------------------------- */
+
 async function searchProduct() {
   const query = document.getElementById("searchInput").value.trim().toLowerCase();
   if (!query) return alert("Please enter a product name!");
@@ -133,7 +170,6 @@ async function searchProduct() {
   }
 }
 
-// 🔹 Show search results
 function showResults(data) {
   let html = "";
   if (data && data.length > 0) {
@@ -171,13 +207,29 @@ function showResults(data) {
   document.getElementById("searchResults").innerHTML = html;
 }
 
-// 🔹 Load on startup
-window.addEventListener("load", async () => {
-  syncOfflineData();
-  await fetchSuggestions();
+/* ---------------------------
+   🔹 Init
+--------------------------- */
 
+window.addEventListener("load", async () => {
+  // ✅ Always load suggestions from LocalStorage first (offline support)
+  loadSuggestionsFromLocal();
+
+  // ✅ Sync pending offline data
+  syncOfflineData();
+
+  // ✅ If online, fetch latest suggestions from Sheet
+  if (navigator.onLine) {
+    await fetchSuggestions();
+  }
+
+  // ✅ Set current date
   const today = new Date().toISOString().split("T")[0];
   document.getElementById("dateInput").value = today;
 });
 
-window.addEventListener("online", syncOfflineData);
+// ✅ Auto sync when back online
+window.addEventListener("online", async () => {
+  await syncOfflineData();
+  await fetchSuggestions(); // refresh suggestions
+});
