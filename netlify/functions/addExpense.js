@@ -2,7 +2,6 @@ const { google } = require("googleapis");
 
 exports.handler = async (event, context) => {
   try {
-    // ✅ Google Auth
     const auth = new google.auth.GoogleAuth({
       credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
       scopes: ["https://www.googleapis.com/auth/spreadsheets"]
@@ -10,23 +9,33 @@ exports.handler = async (event, context) => {
 
     const sheets = google.sheets({ version: "v4", auth });
     const sheetId = process.env.SHEET_ID;
-    const sheetName = "2025"; // 👈 Year-wise sheet ka naam
+    const sheetName = "2025"; // 👈 apne year-wise sheet ka naam
 
-    // ✅ SEARCH (GET request)
+    // ✅ Fetch suggestions (GET /?suggestions=true)
+    if (event.httpMethod === "GET" && event.queryStringParameters.suggestions) {
+      const res = await sheets.spreadsheets.values.get({
+        spreadsheetId: sheetId,
+        range: "Suggestions!A:D" // Product, For, By, From
+      });
+
+      const rows = res.data.values || [];
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ result: "success", data: rows })
+      };
+    }
+
+    // ✅ Search product (GET /?search=...)
     if (event.httpMethod === "GET" && event.queryStringParameters.search) {
       const query = event.queryStringParameters.search.toLowerCase();
-
-      // Get all rows
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: `${sheetName}!A:M` // Full columns
+        range: `${sheetName}!A:M`
       });
 
       const rows = response.data.values || [];
-
-      // Filter rows by product (column F → index 5)
       const filtered = rows.filter((row, index) => {
-        if (index === 0) return false; // skip header
+        if (index === 0) return false;
         return row[5] && row[5].toLowerCase().includes(query);
       });
 
@@ -36,7 +45,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ ADD ENTRY (POST request)
+    // ✅ Add entry (POST)
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body);
 
@@ -48,32 +57,32 @@ exports.handler = async (event, context) => {
       const numRows = response.data.values ? response.data.values.length : 0;
       const nextRow = numRows + 1;
 
-      // Format Day & Date
+      // Format date
       const dateObj = new Date(body.date);
       const dayName = dateObj.toLocaleDateString("en-US", { weekday: "long" });
       const formattedDate = `${String(dateObj.getDate()).padStart(2, "0")}-${dateObj.toLocaleString("en-US", { month: "long" })}-${dateObj.getFullYear()}`;
 
-      // Insert row
+      // Insert into expense sheet
       await sheets.spreadsheets.values.update({
         spreadsheetId: sheetId,
         range: `${sheetName}!A${nextRow}`,
         valueInputOption: "RAW",
         resource: {
           values: [[
-            dayName,          // A → Day
-            formattedDate,    // B → Date
-            "",               // C → Credit
-            "",               // D → Left Balance
-            body.debit,       // E → Debit
-            body.product,     // F → Product
-            body.for,         // G → For
-            body.quantity,    // H → Quantity
-            body.by,          // I → By
-            body.from,        // J → From
-            "",               // K → Extra Spent
-            "",               // L → Daily Limit
-            ""                // M → Remaining Limit
+            dayName, formattedDate, "", "", body.debit,
+            body.product, body.for, body.quantity,
+            body.by, body.from, "", "", ""
           ]]
+        }
+      });
+
+      // ✅ Also save suggestions in Suggestions sheet
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: sheetId,
+        range: "Suggestions!A:D",
+        valueInputOption: "RAW",
+        resource: {
+          values: [[body.product || "", body.for || "", body.by || "", body.from || ""]]
         }
       });
 
@@ -83,12 +92,10 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ If method not handled
     return {
       statusCode: 400,
       body: JSON.stringify({ result: "error", message: "Invalid request" })
     };
-
   } catch (err) {
     return {
       statusCode: 500,
