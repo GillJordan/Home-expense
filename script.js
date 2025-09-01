@@ -3,11 +3,10 @@ const scriptURL = "/.netlify/functions/addExpense";
 /* ---------------------------
    🔹 Suggestions Handling
 --------------------------- */
-
-// Fetch suggestions from Google Sheet
 async function fetchSuggestions() {
   try {
-    const res = await fetch(`${scriptURL}?suggestions=true`);
+    const sheet = document.getElementById("sheetSelect").value;
+    const res = await fetch(`${scriptURL}?suggestions=true&sheet=${sheet}`);
     const result = await res.json();
 
     if (result.result === "success") {
@@ -18,7 +17,6 @@ async function fetchSuggestions() {
       loadSuggestionsFromSet(new Set(data.byList), "byList");
       loadSuggestionsFromSet(new Set(data.fromList), "fromList");
 
-      // ✅ Save into LocalStorage for offline use
       localStorage.setItem("productSuggestions", JSON.stringify(data.products));
       localStorage.setItem("forSuggestions", JSON.stringify(data.forList));
       localStorage.setItem("bySuggestions", JSON.stringify(data.byList));
@@ -29,7 +27,6 @@ async function fetchSuggestions() {
   }
 }
 
-// Load suggestions from LocalStorage (offline mode)
 function loadSuggestionsFromLocal() {
   loadSuggestionsFromKey("productSuggestions", "productList");
   loadSuggestionsFromKey("forSuggestions", "forList");
@@ -61,7 +58,6 @@ function loadSuggestionsFromSet(set, datalistId) {
 /* ---------------------------
    🔹 Offline Save & Sync
 --------------------------- */
-
 function saveOffline(data) {
   let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
   pending.push(data);
@@ -106,11 +102,12 @@ async function syncOfflineData() {
 /* ---------------------------
    🔹 Form Submit
 --------------------------- */
-
 document.getElementById("dataForm").addEventListener("submit", async function (e) {
   e.preventDefault();
   const formData = new FormData(this);
   const data = Object.fromEntries(formData.entries());
+
+  data.sheetName = document.getElementById("sheetSelect").value;
 
   try {
     const res = await fetch(scriptURL, {
@@ -124,7 +121,7 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
       alert("✅ Data submitted successfully!");
       this.reset();
       saveEntryLocal(data);
-      await fetchSuggestions(); // refresh suggestions live
+      await fetchSuggestions();
     } else {
       throw new Error(result.message);
     }
@@ -136,9 +133,9 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
 /* ---------------------------
    🔹 Search (Online + Offline)
 --------------------------- */
-
 async function searchProduct() {
   const query = document.getElementById("searchInput").value.trim().toLowerCase();
+  const sheet = document.getElementById("sheetSelect").value;
   if (!query) return alert("Please enter a product name!");
 
   if (!navigator.onLine) {
@@ -148,7 +145,7 @@ async function searchProduct() {
   }
 
   try {
-    const res = await fetch(`${scriptURL}?search=${encodeURIComponent(query)}`);
+    const res = await fetch(`${scriptURL}?search=${encodeURIComponent(query)}&sheet=${sheet}`);
     const result = await res.json();
     showResults(result.data || []);
   } catch (err) {
@@ -160,6 +157,13 @@ async function searchProduct() {
 function showResults(data) {
   let html = "";
   if (data && data.length > 0) {
+    // 🔹 Total Debit calculate
+    let totalDebit = data.reduce((sum, row) => {
+      let debitVal = row.debit || row[4];
+      let num = parseFloat(debitVal) || 0;
+      return sum + num;
+    }, 0);
+
     html = `
       <table class="w-full text-left border border-gray-600 mt-4">
         <thead>
@@ -185,6 +189,11 @@ function showResults(data) {
               <td class="p-2 border border-gray-700">${row.from || row[9] || ""}</td>
             </tr>
           `).join("")}
+          <tr class="bg-gray-900 font-bold text-green-400">
+            <td colspan="2" class="p-2 border border-gray-700 text-right">Total Debit:</td>
+            <td class="p-2 border border-gray-700">${totalDebit}</td>
+            <td colspan="4"></td>
+          </tr>
         </tbody>
       </table>
     `;
@@ -197,26 +206,19 @@ function showResults(data) {
 /* ---------------------------
    🔹 Init
 --------------------------- */
-
 window.addEventListener("load", async () => {
-  // ✅ Load suggestions from LocalStorage first
   loadSuggestionsFromLocal();
-
-  // ✅ Sync pending offline data
   syncOfflineData();
 
-  // ✅ If online, fetch latest suggestions from Sheet
   if (navigator.onLine) {
     await fetchSuggestions();
   }
 
-  // ✅ Set current date
   const today = new Date().toISOString().split("T")[0];
   document.getElementById("dateInput").value = today;
 });
 
-// ✅ Auto sync when back online
 window.addEventListener("online", async () => {
   await syncOfflineData();
-  await fetchSuggestions(); // refresh suggestions
+  await fetchSuggestions();
 });
