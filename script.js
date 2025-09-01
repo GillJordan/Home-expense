@@ -11,31 +11,18 @@ async function fetchSuggestions() {
     const result = await res.json();
 
     if (result.result === "success") {
-      const rows = result.data;
+      const data = result.data;
 
-      const productList = new Set();
-      const forList = new Set();
-      const byList = new Set();
-      const fromList = new Set();
-
-      rows.forEach(row => {
-        if (row[0]) productList.add(row[0]);
-        if (row[1]) forList.add(row[1]);
-        if (row[2]) byList.add(row[2]);
-        if (row[3]) fromList.add(row[3]);
-      });
-
-      // Load into UI
-      loadSuggestionsFromSet(productList, "productList");
-      loadSuggestionsFromSet(forList, "forList");
-      loadSuggestionsFromSet(byList, "byList");
-      loadSuggestionsFromSet(fromList, "fromList");
+      loadSuggestionsFromSet(new Set(data.products), "productList");
+      loadSuggestionsFromSet(new Set(data.forList), "forList");
+      loadSuggestionsFromSet(new Set(data.byList), "byList");
+      loadSuggestionsFromSet(new Set(data.fromList), "fromList");
 
       // ✅ Save into LocalStorage for offline use
-      localStorage.setItem("productSuggestions", JSON.stringify([...productList]));
-      localStorage.setItem("forSuggestions", JSON.stringify([...forList]));
-      localStorage.setItem("bySuggestions", JSON.stringify([...byList]));
-      localStorage.setItem("fromSuggestions", JSON.stringify([...fromList]));
+      localStorage.setItem("productSuggestions", JSON.stringify(data.products));
+      localStorage.setItem("forSuggestions", JSON.stringify(data.forList));
+      localStorage.setItem("bySuggestions", JSON.stringify(data.byList));
+      localStorage.setItem("fromSuggestions", JSON.stringify(data.fromList));
     }
   } catch (err) {
     console.error("❌ Suggestion fetch error:", err);
@@ -212,7 +199,7 @@ function showResults(data) {
 --------------------------- */
 
 window.addEventListener("load", async () => {
-  // ✅ Always load suggestions from LocalStorage first (offline support)
+  // ✅ Load suggestions from LocalStorage first
   loadSuggestionsFromLocal();
 
   // ✅ Sync pending offline data
