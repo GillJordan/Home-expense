@@ -11,21 +11,47 @@ exports.handler = async (event, context) => {
     const sheetId = process.env.SHEET_ID;
     const sheetName = "2025"; // 👈 apne year-wise sheet ka naam
 
-    // ✅ Fetch suggestions (GET /?suggestions=true)
+    /* ----------------------
+       ✅ Get Suggestions
+    ---------------------- */
     if (event.httpMethod === "GET" && event.queryStringParameters.suggestions) {
       const res = await sheets.spreadsheets.values.get({
         spreadsheetId: sheetId,
-        range: "Suggestions!A:D" // Product, For, By, From
+        range: `${sheetName}!A:M`
       });
 
       const rows = res.data.values || [];
+
+      const productSet = new Set();
+      const forSet = new Set();
+      const bySet = new Set();
+      const fromSet = new Set();
+
+      rows.forEach((row, index) => {
+        if (index === 0) return; // skip header
+        if (row[5]) productSet.add(row[5]); // Product (F)
+        if (row[6]) forSet.add(row[6]);     // For (G)
+        if (row[8]) bySet.add(row[8]);      // By (I)
+        if (row[9]) fromSet.add(row[9]);    // From (J)
+      });
+
       return {
         statusCode: 200,
-        body: JSON.stringify({ result: "success", data: rows })
+        body: JSON.stringify({
+          result: "success",
+          data: {
+            products: [...productSet],
+            forList: [...forSet],
+            byList: [...bySet],
+            fromList: [...fromSet]
+          }
+        })
       };
     }
 
-    // ✅ Search product (GET /?search=...)
+    /* ----------------------
+       ✅ Search by Product
+    ---------------------- */
     if (event.httpMethod === "GET" && event.queryStringParameters.search) {
       const query = event.queryStringParameters.search.toLowerCase();
       const response = await sheets.spreadsheets.values.get({
@@ -45,7 +71,9 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // ✅ Add entry (POST)
+    /* ----------------------
+       ✅ Add Entry (POST)
+    ---------------------- */
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body);
 
@@ -73,16 +101,6 @@ exports.handler = async (event, context) => {
             body.product, body.for, body.quantity,
             body.by, body.from, "", "", ""
           ]]
-        }
-      });
-
-      // ✅ Also save suggestions in Suggestions sheet
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: sheetId,
-        range: "Suggestions!A:D",
-        valueInputOption: "RAW",
-        resource: {
-          values: [[body.product || "", body.for || "", body.by || "", body.from || ""]]
         }
       });
 
