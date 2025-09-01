@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Expense Entry</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css?v=1"> <!-- version query added -->
   <style>
     body {
-      background-color: #000; /* 🔹 Black background */
+      background-color: #000; /* Black background */
       color: white;
     }
 
@@ -67,70 +68,10 @@
     </form>
   </div>
 
+  <script src="script.js?v=1"></script> <!-- version query added -->
+
+  <!-- Service Worker Register -->
   <script>
-    const scriptURL = "/.netlify/functions/addExpense";
-
-    function saveOffline(data) {
-      let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
-      pending.push(data);
-      localStorage.setItem("pendingEntries", JSON.stringify(pending));
-      alert("📌 Internet nahi hai, data offline save ho gaya. Net aate hi sync ho jaayega.");
-    }
-
-    async function syncOfflineData() {
-      let pending = JSON.parse(localStorage.getItem("pendingEntries")) || [];
-      if (pending.length === 0) return;
-
-      for (let i = 0; i < pending.length; i++) {
-        try {
-          const res = await fetch(scriptURL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(pending[i])
-          });
-          const result = await res.json();
-
-          if (result.result === "success") {
-            console.log("✅ Synced:", pending[i]);
-            pending.splice(i, 1);
-            i--;
-          }
-        } catch (err) {
-          console.warn("❌ Sync failed, retry later:", err);
-          break;
-        }
-      }
-
-      localStorage.setItem("pendingEntries", JSON.stringify(pending));
-    }
-
-    document.getElementById("dataForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-      const data = Object.fromEntries(formData.entries());
-
-      try {
-        const res = await fetch(scriptURL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-        const result = await res.json();
-
-        if (result.result === "success") {
-          alert("✅ Data submitted successfully!");
-          this.reset();
-        } else {
-          throw new Error(result.message);
-        }
-      } catch (err) {
-        saveOffline(data);
-      }
-    });
-
-    window.addEventListener("online", syncOfflineData);
-    window.addEventListener("load", syncOfflineData);
-
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/service-worker.js")
         .then(() => console.log("✅ Service Worker Registered"))
