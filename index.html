@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
-      background-color: #000; /* Black background */
+      background-color: #000;
       color: white;
     }
 
@@ -71,18 +71,17 @@
     }
   </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
+<body class="flex flex-col items-center justify-center min-h-screen space-y-6">
+
+  <!-- Expense Entry Form -->
   <div class="rgb-border w-full max-w-2xl rounded-2xl">
     <div class="content p-8">
       <h2 class="text-2xl font-bold text-center mb-6">Expense Entry</h2>
       
       <form id="dataForm" class="grid grid-cols-2 gap-4">
-        <!-- Date with auto current date -->
         <input type="date" id="dateInput" name="date" required class="px-3 py-2 rounded-lg col-span-2">
-
         <input type="text" name="debit" placeholder="Debit" required class="px-3 py-2 rounded-lg">
 
-        <!-- Autocomplete fields with datalist -->
         <input type="text" name="product" list="productList" placeholder="Product" required class="px-3 py-2 rounded-lg">
         <datalist id="productList"></datalist>
 
@@ -104,64 +103,87 @@
     </div>
   </div>
 
+  <!-- 🔎 Search Section -->
+  <div class="rgb-border w-full max-w-2xl rounded-2xl">
+    <div class="content p-8">
+      <h2 class="text-2xl font-bold text-center mb-6">Search Expenses</h2>
+      
+      <div class="flex gap-2">
+        <input type="text" id="searchInput" placeholder="Search by Product" class="flex-1 px-3 py-2 rounded-lg">
+        <button onclick="searchProduct()" class="px-4 py-2 rounded-lg">Search</button>
+      </div>
+
+      <!-- Results -->
+      <div id="searchResults" class="mt-6"></div>
+    </div>
+  </div>
+
   <script src="script.js"></script>
 
   <!-- Service Worker Register -->
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/service-worker.js")
-        .then(reg => {
-          reg.update();
-          console.log("✅ Service Worker Registered & Updated");
-        })
+        .then(reg => { reg.update(); console.log("✅ Service Worker Registered & Updated"); })
         .catch(err => console.error("❌ SW registration failed:", err));
     }
 
-    // 🔹 Set current date automatically in date input
+    // 🔹 Current date auto-fill
     window.addEventListener("load", () => {
       const today = new Date().toISOString().split("T")[0];
       document.getElementById("dateInput").value = today;
     });
 
-    // 🔹 Manage autocomplete suggestions
-    function saveSuggestion(field, value) {
-      if (!value) return;
-      let key = field + "Suggestions";
-      let suggestions = JSON.parse(localStorage.getItem(key)) || [];
-      if (!suggestions.includes(value)) {
-        suggestions.push(value);
-        localStorage.setItem(key, JSON.stringify(suggestions));
+    // 🔎 Search function
+    async function searchProduct() {
+      const query = document.getElementById("searchInput").value.trim();
+      if (!query) return alert("Please enter a product name!");
+
+      try {
+        const res = await fetch(`/.netlify/functions/addExpense?search=${encodeURIComponent(query)}`);
+        const result = await res.json();
+
+        let html = "";
+        if (result.data && result.data.length > 0) {
+          html = `
+            <table class="w-full text-left border border-gray-600 mt-4">
+              <thead>
+                <tr class="bg-gray-800">
+                  <th class="p-2 border border-gray-700">Date</th>
+                  <th class="p-2 border border-gray-700">Product</th>
+                  <th class="p-2 border border-gray-700">Debit</th>
+                  <th class="p-2 border border-gray-700">For</th>
+                  <th class="p-2 border border-gray-700">Quantity</th>
+                  <th class="p-2 border border-gray-700">By</th>
+                  <th class="p-2 border border-gray-700">From</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${result.data.map(row => `
+                  <tr>
+                    <td class="p-2 border border-gray-700">${row[1] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[5] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[4] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[6] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[7] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[8] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[9] || ""}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          `;
+        } else {
+          html = "<p class='mt-4 text-red-400'>No records found</p>";
+        }
+
+        document.getElementById("searchResults").innerHTML = html;
+
+      } catch (err) {
+        console.error("❌ Search error:", err);
+        alert("Error fetching search results!");
       }
     }
-
-    function loadSuggestions(field, datalistId) {
-      let key = field + "Suggestions";
-      let suggestions = JSON.parse(localStorage.getItem(key)) || [];
-      let datalist = document.getElementById(datalistId);
-      datalist.innerHTML = "";
-      suggestions.forEach(item => {
-        let option = document.createElement("option");
-        option.value = item;
-        datalist.appendChild(option);
-      });
-    }
-
-    // Load suggestions on page load
-    window.addEventListener("load", () => {
-      loadSuggestions("product", "productList");
-      loadSuggestions("for", "forList");
-      loadSuggestions("by", "byList");
-      loadSuggestions("from", "fromList");
-    });
-
-    // On form submit → save new suggestions
-    document.getElementById("dataForm").addEventListener("submit", () => {
-      const form = document.getElementById("dataForm");
-      saveSuggestion("product", form.product.value);
-      saveSuggestion("for", form.for.value);
-      saveSuggestion("by", form.by.value);
-      saveSuggestion("from", form.from.value);
-    });
   </script>
 </body>
 </html>
