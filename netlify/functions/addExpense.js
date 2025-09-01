@@ -4,124 +4,128 @@ exports.handler = async (event, context) => {
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"]
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
 
     const sheets = google.sheets({ version: "v4", auth });
-    const sheetId = process.env.SHEET_ID;
 
-    /* ----------------------
-       ✅ Get Suggestions
-    ---------------------- */
-    if (event.httpMethod === "GET" && event.queryStringParameters.suggestions) {
-      const sheetName = event.queryStringParameters.sheet || new Date().getFullYear().toString();
+    const spreadsheetId = process.env.SHEET_ID;
 
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: `${sheetName}!A:M`
-      });
-
-      const rows = res.data.values || [];
-
-      const productSet = new Set();
-      const forSet = new Set();
-      const bySet = new Set();
-      const fromSet = new Set();
-
-      rows.forEach((row, index) => {
-        if (index === 0) return; // skip header
-        if (row[5]) productSet.add(row[5]); // Product (F)
-        if (row[6]) forSet.add(row[6]);     // For (G)
-        if (row[8]) bySet.add(row[8]);      // By (I)
-        if (row[9]) fromSet.add(row[9]);    // From (J)
-      });
-
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          result: "success",
-          data: {
-            products: [...productSet],
-            forList: [...forSet],
-            byList: [...bySet],
-            fromList: [...fromSet]
-          }
-        })
-      };
-    }
-
-    /* ----------------------
-       ✅ Search by Product
-    ---------------------- */
+    // ✅ Search request
     if (event.httpMethod === "GET" && event.queryStringParameters.search) {
-      const sheetName = event.queryStringParameters.sheet || new Date().getFullYear().toString();
-      const query = event.queryStringParameters.search.toLowerCase();
+      const searchTerm = event.queryStringParameters.search.toLowerCase();
 
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: `${sheetName}!A:M`
-      });
+      // ✅ Loop all sheets (year-wise)
+      const meta = await sheets.spreadsheets.get({ spreadsheetId });
+      let allRows = [];
 
-      const rows = response.data.values || [];
-      const filtered = rows.filter((row, index) => {
-        if (index === 0) return false;
-        return row[5] && row[5].toLowerCase().includes(query);
-      });
+      for (let sheetInfo of meta.data.sheets) {
+        const sheetName = sheetInfo.properties.title;
+        const read = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${sheetName}!A:M`,
+        });
+
+        const rows = read.data.values || [];
+        const filtered = rows.filter(
+          (row) => row[5] && row[5].toLowerCase().includes(searchTerm)
+        );
+        allRows = allRows.concat(filtered);
+      }
 
       return {
         statusCode: 200,
-        body: JSON.stringify({ result: "success", data: filtered })
+        body: JSON.stringify({ data: allRows }),
       };
     }
 
-    /* ----------------------
-       ✅ Add Entry (POST)
-    ---------------------- */
+    // ✅ Insert request
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body);
-      const sheetName = body.sheetName || new Date().getFullYear().toString();
-
-      // Get last row
-      const response = await sheets.spreadsheets.values.get({
-        spreadsheetId: sheetId,
-        range: `${sheetName}!A:A`
-      });
-      const numRows = response.data.values ? response.data.values.length : 0;
-      const nextRow = numRows + 1;
-
-      // Format date
       const dateObj = new Date(body.date);
-      const dayName = dateObj.toLocaleDateString("en-US", { weekday: "long" });
-      const formattedDate = `${String(dateObj.getDate()).padStart(2, "0")}-${dateObj.toLocaleString("en-US", { month: "long" })}-${dateObj.getFullYear()}`;
+      const year = dateObj.getFullYear().toString();
 
-      // Insert into expense sheet
-      await sheets.spreadsheets.values.update({
-        spreadsheetId: sheetId,
-        range: `${sheetName}!A${nextRow}`,
+      // ✅ Ensure sheet exists
+      const meta = await sheets.spreadsheets.get({ spreadsheetId });
+      let sheetNames = meta.data.sheets.map((s) => s.properties.title);
+
+      if (!sheetNames.includes(year)) {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [
+              {
+                addSheet: {
+                  properties: { title: year },
+                },
+              },
+            ],
+          },
+        });
+
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `${year}!A1:M1`,
+          valueInputOption: "RAW",
+          requestBody: {
+            values: [
+              [
+                "Day",
+                "Date",
+                "Credit",
+                "Left Balance",
+                "Debit",
+                "Product",
+                "For",
+                "Quantity",
+                "By",
+                "From",
+                "Extra Spent",
+                "Daily Limit",
+                "Remaining Limit",
+              ],
+            ],
+          },
+        });
+      }
+
+      // ✅ Insert data
+      const day = dateObj.toLocaleDateString("en-US", { weekday: "long" });
+
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${year}!A:M`,
         valueInputOption: "RAW",
-        resource: {
-          values: [[
-            dayName, formattedDate, "", "", body.debit,
-            body.product, body.for, body.quantity,
-            body.by, body.from, "", "", ""
-          ]]
-        }
+        requestBody: {
+          values: [
+            [
+              day,
+              body.date,
+              "",
+              "",
+              body.debit,
+              body.product,
+              body.for,
+              body.quantity,
+              body.by,
+              body.from,
+              "",
+              "",
+              "",
+            ],
+          ],
+        },
       });
 
       return {
         statusCode: 200,
-        body: JSON.stringify({ result: "success", data: body })
+        body: JSON.stringify({ message: "✅ Data added successfully" }),
       };
     }
 
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ result: "error", message: "Invalid request" })
-    };
+    return { statusCode: 405, body: "Method Not Allowed" };
   } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ result: "error", message: err.message })
-    };
+    console.error("❌ ERROR:", err);
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
