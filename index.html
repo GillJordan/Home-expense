@@ -6,66 +6,69 @@
   <title>Expense Tracker</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    body {
+      background-color: #0f0f0f;
+      color: white;
+    }
     .rgb-border {
       border: 3px solid;
-      border-image-slice: 1;
-      animation: rgb-border 5s linear infinite;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      animation: rgb-border 4s linear infinite;
     }
     @keyframes rgb-border {
-      0%   { border-image-source: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet); }
-      50%  { border-image-source: linear-gradient(270deg, violet, indigo, blue, green, yellow, orange, red); }
-      100% { border-image-source: linear-gradient(90deg, red, orange, yellow, green, blue, indigo, violet); }
+      0% { border-color: red; }
+      20% { border-color: orange; }
+      40% { border-color: yellow; }
+      60% { border-color: green; }
+      80% { border-color: blue; }
+      100% { border-color: violet; }
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table th, table td {
+      border: 1px solid #444;
+      padding: 8px;
+      text-align: center;
+    }
+    table th {
+      background: #222;
     }
   </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
-  <div class="bg-white shadow-lg rounded-2xl p-8 w-full max-w-2xl rgb-border">
-    <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Expense Entry</h2>
+<body class="flex flex-col items-center justify-center min-h-screen space-y-8">
 
-    <!-- 🔹 Sheet Select -->
-    <div class="mb-4">
-      <label class="block mb-2 font-semibold text-gray-700">Select Sheet:</label>
-      <select id="sheetSelect" class="px-3 py-2 border rounded-lg w-full">
-        <option value="2025">2025</option>
-        <option value="2026">2026</option>
-        <option value="2027">2027</option>
-      </select>
-    </div>
-
-    <!-- 🔹 Form -->
+  <!-- Expense Entry -->
+  <div class="bg-gray-900 shadow-lg rgb-border w-full max-w-2xl">
+    <h2 class="text-2xl font-bold text-white mb-6 text-center">Expense Entry</h2>
     <form id="dataForm" class="grid grid-cols-2 gap-4">
-      <input type="date" id="dateInput" name="date" required class="px-3 py-2 border rounded-lg col-span-2">
-
-      <input type="text" name="debit" placeholder="Debit" class="px-3 py-2 border rounded-lg">
-
-      <input list="productList" name="product" placeholder="Product" class="px-3 py-2 border rounded-lg">
+      <input type="date" id="dateInput" name="date" required class="px-3 py-2 border rounded-lg col-span-2 text-black">
+      <input type="text" name="debit" placeholder="Debit" class="px-3 py-2 border rounded-lg text-black">
+      <input list="productList" name="product" placeholder="Product" class="px-3 py-2 border rounded-lg text-black">
       <datalist id="productList"></datalist>
-
-      <input list="forList" name="for" placeholder="For" class="px-3 py-2 border rounded-lg">
+      <input list="forList" name="for" placeholder="For" class="px-3 py-2 border rounded-lg text-black">
       <datalist id="forList"></datalist>
-
-      <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 border rounded-lg">
-
-      <input list="byList" name="by" placeholder="By" class="px-3 py-2 border rounded-lg">
+      <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 border rounded-lg text-black">
+      <input list="byList" name="by" placeholder="By" class="px-3 py-2 border rounded-lg text-black">
       <datalist id="byList"></datalist>
-
-      <input list="fromList" name="from" placeholder="From" class="px-3 py-2 border rounded-lg">
+      <input list="fromList" name="from" placeholder="From" class="px-3 py-2 border rounded-lg text-black">
       <datalist id="fromList"></datalist>
-
       <button type="submit" class="col-span-2 bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
         Submit
       </button>
     </form>
+  </div>
 
-    <!-- 🔹 Search Section -->
-    <div class="mt-8">
-      <h3 class="text-xl font-semibold mb-4">Search by Product</h3>
-      <div class="flex gap-2">
-        <input type="text" id="searchInput" placeholder="Enter product name" class="flex-1 px-3 py-2 border rounded-lg">
-        <button onclick="searchProduct()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Search</button>
-      </div>
-      <div id="searchResults" class="mt-4"></div>
+  <!-- Search Expenses -->
+  <div class="bg-gray-900 shadow-lg rgb-border w-full max-w-4xl">
+    <h3 class="text-xl font-semibold mb-4 text-center">Search Expenses</h3>
+    <div class="flex gap-2 mb-4">
+      <input type="text" id="searchInput" placeholder="Search by Product" class="flex-1 px-3 py-2 border rounded-lg text-black">
+      <button onclick="searchProduct()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Search</button>
     </div>
+    <div id="searchResults" class="mt-4"></div>
   </div>
 
   <script src="script.js"></script>
