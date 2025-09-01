@@ -108,26 +108,20 @@
     <div class="content p-8">
       <h2 class="text-2xl font-bold text-center mb-6">Search Expenses</h2>
       
-      <div class="flex gap-2">
-        <input type="text" id="searchInput" placeholder="Search by Product" class="flex-1 px-3 py-2 rounded-lg">
-        <button onclick="searchProduct()" class="px-4 py-2 rounded-lg">Search</button>
+      <div class="grid grid-cols-2 gap-2 mb-4">
+        <input type="text" id="searchInput" placeholder="Search by Product" class="col-span-2 px-3 py-2 rounded-lg">
+        <input type="date" id="startDate" class="px-3 py-2 rounded-lg">
+        <input type="date" id="endDate" class="px-3 py-2 rounded-lg">
       </div>
+
+      <button onclick="searchProduct()" class="w-full px-4 py-2 rounded-lg">Search</button>
 
       <!-- Results -->
       <div id="searchResults" class="mt-6"></div>
     </div>
   </div>
 
-  <script src="script.js"></script>
-
-  <!-- Service Worker Register -->
   <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/service-worker.js")
-        .then(reg => { reg.update(); console.log("✅ Service Worker Registered & Updated"); })
-        .catch(err => console.error("❌ SW registration failed:", err));
-    }
-
     // 🔹 Current date auto-fill
     window.addEventListener("load", () => {
       const today = new Date().toISOString().split("T")[0];
@@ -137,10 +131,17 @@
     // 🔎 Search function
     async function searchProduct() {
       const query = document.getElementById("searchInput").value.trim();
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+
       if (!query) return alert("Please enter a product name!");
 
       try {
-        const res = await fetch(`/.netlify/functions/addExpense?search=${encodeURIComponent(query)}`);
+        let url = `/.netlify/functions/addExpense?search=${encodeURIComponent(query)}`;
+        if (startDate) url += `&startDate=${startDate}`;
+        if (endDate) url += `&endDate=${endDate}`;
+
+        const res = await fetch(url);
         const result = await res.json();
 
         let html = "";
@@ -164,16 +165,16 @@
                   let debit = parseFloat(row[4] || 0);
                   totalDebit += isNaN(debit) ? 0 : debit;
                   return `
-                  <tr>
-                    <td class="p-2 border border-gray-700">${row[1] || ""}</td>
-                    <td class="p-2 border border-gray-700">${row[5] || ""}</td>
-                    <td class="p-2 border border-gray-700">${row[4] || ""}</td>
-                    <td class="p-2 border border-gray-700">${row[6] || ""}</td>
-                    <td class="p-2 border border-gray-700">${row[7] || ""}</td>
-                    <td class="p-2 border border-gray-700">${row[8] || ""}</td>
-                    <td class="p-2 border border-gray-700">${row[9] || ""}</td>
-                  </tr>
-                `;
+                    <tr>
+                      <td class="p-2 border border-gray-700">${row[1] || ""}</td>
+                      <td class="p-2 border border-gray-700">${row[5] || ""}</td>
+                      <td class="p-2 border border-gray-700">${row[4] || ""}</td>
+                      <td class="p-2 border border-gray-700">${row[6] || ""}</td>
+                      <td class="p-2 border border-gray-700">${row[7] || ""}</td>
+                      <td class="p-2 border border-gray-700">${row[8] || ""}</td>
+                      <td class="p-2 border border-gray-700">${row[9] || ""}</td>
+                    </tr>
+                  `;
                 }).join("")}
               </tbody>
             </table>
