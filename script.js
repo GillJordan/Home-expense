@@ -16,10 +16,12 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
     if (result.message) {
       alert("✅ Data submitted successfully!");
       this.reset();
-      // Reset date after submit
       document.getElementById("dateInput").value = new Date().toISOString().split("T")[0];
       loadSuggestions();
-      loadDailyData(data.date);
+
+      // 🔹 Add new row instantly in Daily Data without reload
+      appendDailyRow(result.row);
+
     } else {
       alert("❌ Error: " + JSON.stringify(result));
     }
@@ -63,94 +65,69 @@ async function loadDailyData(date) {
   try {
     const res = await fetch(`${apiURL}?daily=true&date=${date}`);
     const result = await res.json();
-
-    let html = "";
-    if (result.data && result.data.length > 0) {
-      html = `
-        <table class="w-full text-left border border-gray-600 mt-4">
-          <thead>
-            <tr class="bg-gray-800">
-              <th class="p-2 border">Date</th>
-              <th class="p-2 border">Product</th>
-              <th class="p-2 border">Debit</th>
-              <th class="p-2 border">For</th>
-              <th class="p-2 border">By</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${result.data.map(row => `
-              <tr>
-                <td class="p-2 border">${row[1]}</td>
-                <td class="p-2 border">${row[5]}</td>
-                <td class="p-2 border">${row[4]}</td>
-                <td class="p-2 border">${row[6]}</td>
-                <td class="p-2 border">${row[8]}</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>`;
-    } else {
-      html = "<p class='text-gray-400'>No data for today</p>";
-    }
-    document.getElementById("dailyData").innerHTML = html;
+    renderDailyTable(result.data);
   } catch (err) {
     console.error("❌ Daily data error:", err);
   }
 }
 
-// ✅ Search
-async function searchProduct() {
-  const query = document.getElementById("searchInput").value.trim();
-  const startDate = document.getElementById("startDate").value;
-  const endDate = document.getElementById("endDate").value;
-  if (!query) return alert("Please enter a product name!");
-
-  try {
-    let url = `${apiURL}?search=${encodeURIComponent(query)}`;
-    if (startDate) url += `&startDate=${startDate}`;
-    if (endDate) url += `&endDate=${endDate}`;
-    const res = await fetch(url);
-    const result = await res.json();
-
-    let html = "";
-    if (result.data && result.data.length > 0) {
-      let totalDebit = 0;
-      html = `
-        <table class="w-full text-left border border-gray-600 mt-4">
-          <thead>
-            <tr class="bg-gray-800">
-              <th class="p-2 border">Date</th>
-              <th class="p-2 border">Product</th>
-              <th class="p-2 border">Debit</th>
-              <th class="p-2 border">For</th>
-              <th class="p-2 border">Quantity</th>
-              <th class="p-2 border">By</th>
-              <th class="p-2 border">From</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${result.data.map(row => {
-              let debit = parseFloat(row[4] || 0);
-              totalDebit += isNaN(debit) ? 0 : debit;
-              return `
-                <tr>
-                  <td class="p-2 border">${row[1] || ""}</td>
-                  <td class="p-2 border">${row[5] || ""}</td>
-                  <td class="p-2 border">${row[4] || ""}</td>
-                  <td class="p-2 border">${row[6] || ""}</td>
-                  <td class="p-2 border">${row[7] || ""}</td>
-                  <td class="p-2 border">${row[8] || ""}</td>
-                  <td class="p-2 border">${row[9] || ""}</td>
-                </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-        <p class="mt-4 font-bold text-green-400">Total Debit: ${totalDebit}</p>`;
-    } else {
-      html = "<p class='mt-4 text-red-400'>No records found</p>";
-    }
-    document.getElementById("searchResults").innerHTML = html;
-  } catch (err) {
-    console.error("❌ Search error:", err);
+// ✅ Append single row (instant update)
+function appendDailyRow(row) {
+  let table = document.querySelector("#dailyData table tbody");
+  if (!table) {
+    document.getElementById("dailyData").innerHTML = `
+      <table class="w-full text-left border border-gray-600 mt-4">
+        <thead>
+          <tr class="bg-gray-800">
+            <th class="p-2 border">Date</th>
+            <th class="p-2 border">Product</th>
+            <th class="p-2 border">Debit</th>
+            <th class="p-2 border">For</th>
+            <th class="p-2 border">By</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>`;
+    table = document.querySelector("#dailyData table tbody");
   }
+  table.innerHTML += `
+    <tr>
+      <td class="p-2 border">${row[1]}</td>
+      <td class="p-2 border">${row[5]}</td>
+      <td class="p-2 border">${row[4]}</td>
+      <td class="p-2 border">${row[6]}</td>
+      <td class="p-2 border">${row[8]}</td>
+    </tr>`;
+}
+
+// ✅ Render full daily table
+function renderDailyTable(rows) {
+  let html = "";
+  if (rows && rows.length > 0) {
+    html = `
+      <table class="w-full text-left border border-gray-600 mt-4">
+        <thead>
+          <tr class="bg-gray-800">
+            <th class="p-2 border">Date</th>
+            <th class="p-2 border">Product</th>
+            <th class="p-2 border">Debit</th>
+            <th class="p-2 border">For</th>
+            <th class="p-2 border">By</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r => `
+            <tr>
+              <td class="p-2 border">${r[1]}</td>
+              <td class="p-2 border">${r[5]}</td>
+              <td class="p-2 border">${r[4]}</td>
+              <td class="p-2 border">${r[6]}</td>
+              <td class="p-2 border">${r[8]}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+  } else {
+    html = "<p class='text-gray-400'>No data for today</p>";
+  }
+  document.getElementById("dailyData").innerHTML = html;
 }
