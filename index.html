@@ -7,28 +7,17 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background-color: #000; color: white; }
-
     .rgb-border {
-      position: relative;
-      border-radius: 1rem;
-      overflow: hidden;
-      padding: 2px;
+      position: relative; border-radius: 1rem; overflow: hidden; padding: 2px;
     }
     .rgb-border::before {
-      content: "";
-      position: absolute;
-      inset: -50%;
+      content: ""; position: absolute; inset: -50%;
       background: conic-gradient(red, orange, yellow, green, cyan, blue, violet, red);
-      animation: spin 5s linear infinite;
-      z-index: 0;
+      animation: spin 5s linear infinite; z-index: 0;
     }
     .rgb-border::after {
-      content: "";
-      position: absolute;
-      inset: 4px;
-      background: #111;
-      border-radius: 0.75rem;
-      z-index: 1;
+      content: ""; position: absolute; inset: 4px; background: #111;
+      border-radius: 0.75rem; z-index: 1;
     }
     .content { position: relative; z-index: 2; }
     @keyframes spin { 0% { transform: rotate(0deg);} 100% {transform: rotate(360deg);} }
@@ -38,56 +27,69 @@
     button:hover { opacity: 0.9; }
   </style>
 </head>
-<body class="flex flex-col items-center justify-center min-h-screen space-y-6">
+<body class="flex flex-row items-start justify-center min-h-screen space-x-6 p-6">
 
-  <!-- Expense Entry -->
-  <div class="rgb-border w-full max-w-2xl rounded-2xl">
-    <div class="content p-8">
-      <h2 class="text-2xl font-bold text-center mb-6">Expense Entry</h2>
-      <form id="dataForm" class="grid grid-cols-2 gap-4">
-        <input type="date" id="dateInput" name="date" required class="px-3 py-2 rounded-lg col-span-2">
-        <input type="text" name="debit" placeholder="Debit" required class="px-3 py-2 rounded-lg">
+  <!-- Left: Expense Entry + Search -->
+  <div class="flex flex-col space-y-6 w-1/2">
 
-        <input type="text" name="product" list="productList" placeholder="Product" required class="px-3 py-2 rounded-lg">
-        <datalist id="productList"></datalist>
+    <!-- Expense Entry -->
+    <div class="rgb-border w-full rounded-2xl">
+      <div class="content p-8">
+        <h2 class="text-2xl font-bold text-center mb-6">Expense Entry</h2>
+        <form id="dataForm" class="grid grid-cols-2 gap-4">
+          <input type="date" id="dateInput" name="date" required class="px-3 py-2 rounded-lg col-span-2">
+          <input type="text" name="debit" placeholder="Debit" required class="px-3 py-2 rounded-lg">
 
-        <input type="text" name="for" list="forList" placeholder="For" required class="px-3 py-2 rounded-lg">
-        <datalist id="forList"></datalist>
+          <input type="text" name="product" list="productList" placeholder="Product" required class="px-3 py-2 rounded-lg">
+          <datalist id="productList"></datalist>
 
-        <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 rounded-lg">
+          <input type="text" name="for" list="forList" placeholder="For" required class="px-3 py-2 rounded-lg">
+          <datalist id="forList"></datalist>
 
-        <input type="text" name="by" list="byList" placeholder="By" class="px-3 py-2 rounded-lg">
-        <datalist id="byList"></datalist>
+          <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 rounded-lg">
 
-        <input type="text" name="from" list="fromList" placeholder="From" class="px-3 py-2 rounded-lg col-span-2">
-        <datalist id="fromList"></datalist>
+          <input type="text" name="by" list="byList" placeholder="By" class="px-3 py-2 rounded-lg">
+          <datalist id="byList"></datalist>
 
-        <button type="submit" class="col-span-2 py-2 rounded-lg">Submit</button>
-      </form>
+          <input type="text" name="from" list="fromList" placeholder="From" class="px-3 py-2 rounded-lg col-span-2">
+          <datalist id="fromList"></datalist>
+
+          <button type="submit" class="col-span-2 py-2 rounded-lg">Submit</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="rgb-border w-full rounded-2xl">
+      <div class="content p-8">
+        <h2 class="text-2xl font-bold text-center mb-6">Search Expenses</h2>
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          <input type="text" id="searchInput" placeholder="Search by Product" class="col-span-2 px-3 py-2 rounded-lg">
+          <input type="date" id="startDate" class="px-3 py-2 rounded-lg">
+          <input type="date" id="endDate" class="px-3 py-2 rounded-lg">
+        </div>
+        <button onclick="searchProduct()" class="w-full px-4 py-2 rounded-lg">Search</button>
+        <div id="searchResults" class="mt-6"></div>
+      </div>
     </div>
   </div>
 
-  <!-- Search -->
-  <div class="rgb-border w-full max-w-2xl rounded-2xl">
+  <!-- Right: Daily Data -->
+  <div class="rgb-border w-1/2 rounded-2xl">
     <div class="content p-8">
-      <h2 class="text-2xl font-bold text-center mb-6">Search Expenses</h2>
-      <div class="grid grid-cols-2 gap-2 mb-4">
-        <input type="text" id="searchInput" placeholder="Search by Product" class="col-span-2 px-3 py-2 rounded-lg">
-        <input type="date" id="startDate" class="px-3 py-2 rounded-lg">
-        <input type="date" id="endDate" class="px-3 py-2 rounded-lg">
-      </div>
-      <button onclick="searchProduct()" class="w-full px-4 py-2 rounded-lg">Search</button>
-      <div id="searchResults" class="mt-6"></div>
+      <h2 class="text-2xl font-bold text-center mb-6">Today's Expenses</h2>
+      <div id="dailyData"></div>
     </div>
   </div>
 
   <script src="script.js"></script>
 
   <script>
-    // Auto set current date
+    // Auto date fill
     window.addEventListener("load", () => {
       const today = new Date().toISOString().split("T")[0];
       document.getElementById("dateInput").value = today;
+      loadDailyData(today); // show today's data
     });
   </script>
 </body>
