@@ -22,6 +22,10 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
       // 🔹 Add new row instantly in Daily Data without reload
       appendDailyRow(result.row);
 
+      // 🔹 Update cache also
+      const todayCache = JSON.parse(localStorage.getItem("todayData") || "[]");
+      todayCache.push(result.row);
+      localStorage.setItem("todayData", JSON.stringify(todayCache));
     } else {
       alert("❌ Error: " + JSON.stringify(result));
     }
@@ -65,11 +69,29 @@ async function loadDailyData(date) {
   try {
     const res = await fetch(`${apiURL}?daily=true&date=${date}`);
     const result = await res.json();
-    renderDailyTable(result.data);
+
+    if (result.data) {
+      localStorage.setItem("todayData", JSON.stringify(result.data));
+      renderDailyTable(result.data);
+    }
   } catch (err) {
-    console.error("❌ Daily data error:", err);
+    console.warn("⚠️ Offline mode, loading cached daily data");
+    const cached = localStorage.getItem("todayData");
+    if (cached) {
+      renderDailyTable(JSON.parse(cached));
+    } else {
+      document.getElementById("dailyData").innerHTML =
+        "<p class='text-gray-400'>No data available</p>";
+    }
   }
 }
+
+// ✅ Listen for online status
+window.addEventListener("online", () => {
+  const today = new Date().toISOString().split("T")[0];
+  console.log("🌐 Back online → reloading today’s data");
+  loadDailyData(today);
+});
 
 // ✅ Append single row (instant update)
 function appendDailyRow(row) {
