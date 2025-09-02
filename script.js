@@ -87,9 +87,12 @@ function appendDailyRow(row) {
           </tr>
         </thead>
         <tbody></tbody>
-      </table>`;
+      </table>
+      <p id="dailyTotal" class="mt-4 font-bold text-green-400"></p>
+    `;
     table = document.querySelector("#dailyData table tbody");
   }
+
   table.innerHTML += `
     <tr>
       <td class="p-2 border">${row[1]}</td>
@@ -98,11 +101,15 @@ function appendDailyRow(row) {
       <td class="p-2 border">${row[6]}</td>
       <td class="p-2 border">${row[8]}</td>
     </tr>`;
+
+  updateDailyTotal();
 }
 
 // ✅ Render full daily table
 function renderDailyTable(rows) {
   let html = "";
+  let totalDebit = 0;
+
   if (rows && rows.length > 0) {
     html = `
       <table class="w-full text-left border border-gray-600 mt-4">
@@ -116,18 +123,37 @@ function renderDailyTable(rows) {
           </tr>
         </thead>
         <tbody>
-          ${rows.map(r => `
-            <tr>
-              <td class="p-2 border">${r[1]}</td>
-              <td class="p-2 border">${r[5]}</td>
-              <td class="p-2 border">${r[4]}</td>
-              <td class="p-2 border">${r[6]}</td>
-              <td class="p-2 border">${r[8]}</td>
-            </tr>`).join("")}
+          ${rows.map(r => {
+            let debit = parseFloat(r[4] || 0);
+            totalDebit += isNaN(debit) ? 0 : debit;
+            return `
+              <tr>
+                <td class="p-2 border">${r[1]}</td>
+                <td class="p-2 border">${r[5]}</td>
+                <td class="p-2 border">${r[4]}</td>
+                <td class="p-2 border">${r[6]}</td>
+                <td class="p-2 border">${r[8]}</td>
+              </tr>`;
+          }).join("")}
         </tbody>
-      </table>`;
+      </table>
+      <p id="dailyTotal" class="mt-4 font-bold text-green-400">Total Debit Today: ${totalDebit}</p>
+    `;
   } else {
     html = "<p class='text-gray-400'>No data for today</p>";
   }
+
   document.getElementById("dailyData").innerHTML = html;
+}
+
+// ✅ Update daily total (after instant row append)
+function updateDailyTotal() {
+  const rows = document.querySelectorAll("#dailyData table tbody tr");
+  let total = 0;
+  rows.forEach(r => {
+    const val = parseFloat(r.children[2].textContent || 0);
+    total += isNaN(val) ? 0 : val;
+  });
+  const totalElem = document.getElementById("dailyTotal");
+  if (totalElem) totalElem.textContent = `Total Debit Today: ${total}`;
 }
