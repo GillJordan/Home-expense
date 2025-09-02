@@ -5,7 +5,6 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
   e.preventDefault();
   const formData = new FormData(this);
   const data = Object.fromEntries(formData.entries());
-  console.log("Submitting:", data);
 
   try {
     const res = await fetch(apiURL, {
@@ -14,11 +13,13 @@ document.getElementById("dataForm").addEventListener("submit", async function (e
       body: JSON.stringify(data),
     });
     const result = await res.json();
-    console.log("Response:", result);
     if (result.message) {
       alert("✅ Data submitted successfully!");
       this.reset();
+      // Reset date after submit
+      document.getElementById("dateInput").value = new Date().toISOString().split("T")[0];
       loadSuggestions();
+      loadDailyData(data.date);
     } else {
       alert("❌ Error: " + JSON.stringify(result));
     }
@@ -33,8 +34,6 @@ async function loadSuggestions() {
   try {
     const res = await fetch(`${apiURL}?suggestions=true`);
     const result = await res.json();
-    console.log("Suggestions:", result);
-
     if (result.data) {
       localStorage.setItem("suggestions", JSON.stringify(result.data));
       fillSuggestions(result.data);
@@ -46,7 +45,6 @@ async function loadSuggestions() {
   }
 }
 
-// ✅ Fill datalist
 function fillSuggestions(data) {
   const fillList = (id, arr) => {
     const unique = [...new Set(arr)].filter(Boolean);
@@ -59,6 +57,46 @@ function fillSuggestions(data) {
 }
 
 window.addEventListener("load", loadSuggestions);
+
+// ✅ Daily Data Loader
+async function loadDailyData(date) {
+  try {
+    const res = await fetch(`${apiURL}?daily=true&date=${date}`);
+    const result = await res.json();
+
+    let html = "";
+    if (result.data && result.data.length > 0) {
+      html = `
+        <table class="w-full text-left border border-gray-600 mt-4">
+          <thead>
+            <tr class="bg-gray-800">
+              <th class="p-2 border">Date</th>
+              <th class="p-2 border">Product</th>
+              <th class="p-2 border">Debit</th>
+              <th class="p-2 border">For</th>
+              <th class="p-2 border">By</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${result.data.map(row => `
+              <tr>
+                <td class="p-2 border">${row[1]}</td>
+                <td class="p-2 border">${row[5]}</td>
+                <td class="p-2 border">${row[4]}</td>
+                <td class="p-2 border">${row[6]}</td>
+                <td class="p-2 border">${row[8]}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>`;
+    } else {
+      html = "<p class='text-gray-400'>No data for today</p>";
+    }
+    document.getElementById("dailyData").innerHTML = html;
+  } catch (err) {
+    console.error("❌ Daily data error:", err);
+  }
+}
 
 // ✅ Search
 async function searchProduct() {
@@ -73,7 +111,6 @@ async function searchProduct() {
     if (endDate) url += `&endDate=${endDate}`;
     const res = await fetch(url);
     const result = await res.json();
-    console.log("Search result:", result);
 
     let html = "";
     if (result.data && result.data.length > 0) {
@@ -108,14 +145,12 @@ async function searchProduct() {
             }).join("")}
           </tbody>
         </table>
-        <p class="mt-4 font-bold text-green-400">Total Debit: ${totalDebit}</p>
-      `;
+        <p class="mt-4 font-bold text-green-400">Total Debit: ${totalDebit}</p>`;
     } else {
       html = "<p class='mt-4 text-red-400'>No records found</p>";
     }
     document.getElementById("searchResults").innerHTML = html;
   } catch (err) {
     console.error("❌ Search error:", err);
-    alert("Error fetching search results!");
   }
 }
