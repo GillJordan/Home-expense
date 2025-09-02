@@ -1,5 +1,18 @@
 const { google } = require("googleapis");
 
+// 🔹 Helper to parse "01-September-2025" into Date object
+function parseCustomDate(dateStr) {
+  if (!dateStr) return null;
+  const [day, monthName, year] = dateStr.split("-");
+  const months = {
+    January: 0, February: 1, March: 2, April: 3,
+    May: 4, June: 5, July: 6, August: 7,
+    September: 8, October: 9, November: 10,
+    December: 11
+  };
+  return new Date(year, months[monthName], parseInt(day));
+}
+
 exports.handler = async (event) => {
   try {
     const auth = new google.auth.GoogleAuth({
@@ -193,6 +206,60 @@ exports.handler = async (event) => {
       }
 
       return { statusCode: 200, body: JSON.stringify({ data: allRows }) };
+    }
+
+    // ✅ Search data
+    if (event.httpMethod === "GET" && event.queryStringParameters.search) {
+      const query = (event.queryStringParameters.search || "").toLowerCase();
+      const startDate = event.queryStringParameters.startDate || null;
+      const endDate = event.queryStringParameters.endDate || null;
+
+      const meta = await sheets.spreadsheets.get({ spreadsheetId });
+      let allRows = [];
+
+      for (let s of meta.data.sheets) {
+        const sheetName = s.properties.title;
+        const read = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${sheetName}!A:M`,
+        });
+        const rows = read.data.values || [];
+
+        rows.forEach((r, i) => {
+          if (i === 0) return; // skip header
+
+          const product = (r[5] || "").toLowerCase();
+          const dateStr = r[1] || "";
+
+          let include = true;
+          if (startDate && endDate && dateStr) {
+            try {
+              const rowDate = parseCustomDate(dateStr);
+              const start = new Date(startDate);
+              const end = new Date(endDate);
+              include = rowDate >= start && rowDate <= end;
+            } catch (e) {
+              include = false;
+            }
+          }
+
+          if ((query === "" || product.includes(query)) && include) {
+            allRows.push(r);
+          }
+        });
+      }
+
+      // ✅ Total Debit calculation
+      let totalDebit = 0;
+      allRows.forEach(r => {
+        let val = parseFloat(r[4] || 0);
+        totalDebit += isNaN(val) ? 0 : val;
+      });
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ data: allRows, totalDebit }),
+      };
     }
 
     return { statusCode: 405, body: "Method Not Allowed" };
