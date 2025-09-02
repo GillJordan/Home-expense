@@ -1,8 +1,6 @@
 const { google } = require("googleapis");
 
 exports.handler = async (event) => {
-  console.log("👉 Event:", event.httpMethod, event.queryStringParameters);
-
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
@@ -28,24 +26,12 @@ exports.handler = async (event) => {
           if (row[9]) fromList.push(row[9]);
         });
       }
-      return {
-        statusCode: 200,
-        body: JSON.stringify({
-          data: {
-            products: [...new Set(products)],
-            forList: [...new Set(forList)],
-            byList: [...new Set(byList)],
-            fromList: [...new Set(fromList)],
-          },
-        }),
-      };
+      return { statusCode: 200, body: JSON.stringify({ data: { products: [...new Set(products)], forList: [...new Set(forList)], byList: [...new Set(byList)], fromList: [...new Set(fromList)] } }) };
     }
 
-    // ✅ Search
-    if (event.httpMethod === "GET" && event.queryStringParameters.search) {
-      const searchTerm = event.queryStringParameters.search.toLowerCase();
-      const startDate = event.queryStringParameters.startDate ? new Date(event.queryStringParameters.startDate) : null;
-      const endDate = event.queryStringParameters.endDate ? new Date(event.queryStringParameters.endDate) : null;
+    // ✅ Daily data
+    if (event.httpMethod === "GET" && event.queryStringParameters.daily) {
+      const dateFilter = event.queryStringParameters.date;
       const meta = await sheets.spreadsheets.get({ spreadsheetId });
       let allRows = [];
 
@@ -53,39 +39,27 @@ exports.handler = async (event) => {
         const sheetName = s.properties.title;
         const read = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${sheetName}!A:M` });
         const rows = read.data.values || [];
-        const filtered = rows.filter((row, i) => {
-          if (i === 0) return false;
-          const product = row[5] ? row[5].toLowerCase() : "";
-          if (!product.includes(searchTerm)) return false;
-          if (startDate || endDate) {
-            const rowDate = new Date(row[1]);
-            if (startDate && rowDate < startDate) return false;
-            if (endDate && rowDate > endDate) return false;
-          }
-          return true;
-        });
+        const filtered = rows.filter((row, i) => i !== 0 && row[1] === dateFilter);
         allRows = allRows.concat(filtered);
       }
-
       return { statusCode: 200, body: JSON.stringify({ data: allRows }) };
     }
 
     // ✅ Insert
     if (event.httpMethod === "POST") {
-      console.log("👉 POST Body:", event.body);
-      if (!event.body) return { statusCode: 400, body: "❌ No body" };
-
-      let body;
-      try { body = JSON.parse(event.body); } 
-      catch { return { statusCode: 400, body: "❌ Invalid JSON" }; }
-
+      const body = JSON.parse(event.body);
       const dateObj = new Date(body.date);
-      if (isNaN(dateObj)) return { statusCode: 400, body: "❌ Invalid date" };
-
       const year = dateObj.getFullYear().toString();
+
+      // Format date → 01-September-2025
+      const formattedDate = dateObj.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric"
+      });
+
       const meta = await sheets.spreadsheets.get({ spreadsheetId });
       let sheetNames = meta.data.sheets.map(s => s.properties.title);
-
       if (!sheetNames.includes(year)) {
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId,
@@ -96,22 +70,16 @@ exports.handler = async (event) => {
           range: `${year}!A1:M1`,
           valueInputOption: "RAW",
           requestBody: { values: [[
-            "Day","Date","Credit","Left Balance","Debit",
-            "Product","For","Quantity","By","From",
-            "Extra Spent","Daily Limit","Remaining Limit"
+            "Day","Date","Credit","Left Balance","Debit","Product","For","Quantity","By","From","Extra Spent","Daily Limit","Remaining Limit"
           ]] },
         });
       }
 
       const day = dateObj.toLocaleDateString("en-US", { weekday: "long" });
-      const row = [day, body.date, "", "", body.debit, body.product, body.for, body.quantity, body.by, body.from, "", "", ""];
-      console.log("👉 Appending:", row);
-
+      const row = [day, formattedDate, "", "", body.debit, body.product, body.for, body.quantity, body.by, body.from, "", "", ""];
       await sheets.spreadsheets.values.append({
-        spreadsheetId, range: `${year}!A:M`, valueInputOption: "RAW",
-        requestBody: { values: [row] },
+        spreadsheetId, range: `${year}!A:M`, valueInputOption: "RAW", requestBody: { values: [row] },
       });
-
       return { statusCode: 200, body: JSON.stringify({ message: "✅ Data added", row }) };
     }
 
