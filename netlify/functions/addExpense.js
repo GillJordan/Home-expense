@@ -168,6 +168,15 @@ exports.handler = async (event) => {
     // ✅ Daily data
     if (event.httpMethod === "GET" && event.queryStringParameters.daily) {
       const dateFilter = event.queryStringParameters.date;
+
+      // Convert to "01-September-2025" format (same as sheet)
+      const dateObj = new Date(dateFilter);
+      const formattedFilter = dateObj.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric"
+      });
+
       const meta = await sheets.spreadsheets.get({ spreadsheetId });
       let allRows = [];
 
@@ -178,7 +187,8 @@ exports.handler = async (event) => {
           range: `${sheetName}!A:M`,
         });
         const rows = read.data.values || [];
-        const filtered = rows.filter((r, i) => i !== 0 && r[1] === dateFilter);
+
+        const filtered = rows.filter((r, i) => i !== 0 && r[1] === formattedFilter);
         allRows = allRows.concat(filtered);
       }
 
