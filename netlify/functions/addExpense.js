@@ -88,34 +88,41 @@ exports.handler = async (event) => {
       });
       const lastRow = read.data.values.length;
 
-      // ✅ Copy formulas (C–M i.e. col index 2–13) from lastRow-1 to lastRow
+      // ✅ Copy only formula columns (C:D and L:M)
       if (lastRow > 2) {
-        await sheets.spreadsheets.batchUpdate({
-          spreadsheetId,
-          requestBody: {
-            requests: [
-              {
-                copyPaste: {
-                  source: {
-                    sheetId,
-                    startRowIndex: lastRow - 2,
-                    endRowIndex: lastRow - 1,
-                    startColumnIndex: 2,
-                    endColumnIndex: 13,
+        const formulaColumns = [
+          { start: 2, end: 4 },   // C:D (Credit, Left Balance)
+          { start: 11, end: 13 }, // L:M (Daily Limit, Remaining Limit)
+        ];
+
+        for (let col of formulaColumns) {
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+              requests: [
+                {
+                  copyPaste: {
+                    source: {
+                      sheetId,
+                      startRowIndex: lastRow - 2,
+                      endRowIndex: lastRow - 1,
+                      startColumnIndex: col.start,
+                      endColumnIndex: col.end,
+                    },
+                    destination: {
+                      sheetId,
+                      startRowIndex: lastRow - 1,
+                      endRowIndex: lastRow,
+                      startColumnIndex: col.start,
+                      endColumnIndex: col.end,
+                    },
+                    pasteType: "PASTE_FORMULA",
                   },
-                  destination: {
-                    sheetId,
-                    startRowIndex: lastRow - 1,
-                    endRowIndex: lastRow,
-                    startColumnIndex: 2,
-                    endColumnIndex: 13,
-                  },
-                  pasteType: "PASTE_FORMULA",
                 },
-              },
-            ],
-          },
-        });
+              ],
+            },
+          });
+        }
       }
 
       return {
