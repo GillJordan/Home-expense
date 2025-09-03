@@ -31,6 +31,7 @@ async function syncPendingEntries() {
   // ✅ Reload today’s data after sync
   const today = new Date().toISOString().split("T")[0];
   loadDailyData(today);
+  preloadAllEntries();
 }
 
 // ✅ Form Submit
@@ -139,6 +140,21 @@ function renderDailyTable(rows) {
   document.getElementById("dailyData").innerHTML = html;
 }
 
+// ✅ Preload full sheet data into cache (for offline search)
+async function preloadAllEntries() {
+  if (!navigator.onLine) return;
+  try {
+    const res = await fetch(`${apiURL}?all=true`);
+    const result = await res.json();
+    if (result.data) {
+      localStorage.setItem("entriesCache", JSON.stringify(result.data));
+      console.log("✅ Preloaded all entries into cache");
+    }
+  } catch (err) {
+    console.error("❌ Failed to preload entries:", err);
+  }
+}
+
 // ✅ Search (Online + Offline)
 async function searchProduct() {
   const query = document.getElementById("searchInput").value.trim().toLowerCase();
@@ -147,8 +163,9 @@ async function searchProduct() {
 
   // 📴 OFFLINE MODE
   if (!navigator.onLine) {
-    console.warn("📴 Offline search running on cache");
+    console.warn("📴 Offline search running on full cache");
     const cache = JSON.parse(localStorage.getItem("entriesCache") || "[]");
+
     let filtered = cache.filter(r => (query === "" || (r[5] || "").toLowerCase().includes(query)));
 
     if (startDate && endDate) {
@@ -156,7 +173,7 @@ async function searchProduct() {
       const end = new Date(endDate);
       filtered = filtered.filter(r => {
         try {
-          const rowDate = new Date(r[1]); // formatted date string
+          const rowDate = new Date(r[1]);
           return rowDate >= start && rowDate <= end;
         } catch {
           return false;
@@ -178,12 +195,8 @@ async function searchProduct() {
     const res = await fetch(url);
     const result = await res.json();
 
-    // 🔹 Save all results to cache
-    if (result.data) {
-      let cache = JSON.parse(localStorage.getItem("entriesCache") || "[]");
-      cache = cache.concat(result.data);
-      localStorage.setItem("entriesCache", JSON.stringify(cache));
-    }
+    // 🔹 Refresh cache with full dataset
+    preloadAllEntries();
 
     renderSearchResults(result);
   } catch (err) {
@@ -237,4 +250,10 @@ function calcTotalDebit(rows) {
 }
 
 // ✅ Sync when back online
-window.addEventListener("online", syncPendingEntries);
+window.addEventListener("online", () => {
+  syncPendingEntries();
+  preloadAllEntries();
+});
+
+// ✅ Preload full cache at startup if online
+window.addEventListener("load", preloadAllEntries);
