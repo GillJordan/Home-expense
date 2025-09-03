@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Expense Entry</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -63,8 +63,8 @@
     <div class="rgb-border w-full rounded-2xl">
       <div class="content p-6 sm:p-8">
         <h2 class="text-xl sm:text-2xl font-bold text-center mb-6">Search Expenses</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-          <input type="text" id="searchInput" placeholder="Search by Product" class="px-3 py-2 rounded-lg sm:col-span-2">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+          <input type="text" id="searchInput" placeholder="Search by Product" class="px-3 py-2 rounded-lg">
           <input type="date" id="startDate" class="px-3 py-2 rounded-lg">
           <input type="date" id="endDate" class="px-3 py-2 rounded-lg">
         </div>
@@ -89,8 +89,66 @@
     window.addEventListener("load", () => {
       const today = new Date().toISOString().split("T")[0];
       document.getElementById("dateInput").value = today;
-      loadDailyData(today); // show today's data
+      loadDailyData(today);
     });
+
+    // 🔎 Search function
+    async function searchProduct() {
+      const query = document.getElementById("searchInput").value.trim();
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+
+      let url = `/.netlify/functions/addExpense?search=${encodeURIComponent(query)}`;
+      if (startDate && endDate) {
+        url += `&startDate=${startDate}&endDate=${endDate}`;
+      }
+
+      try {
+        const res = await fetch(url);
+        const result = await res.json();
+
+        let html = "";
+        if (result.data && result.data.length > 0) {
+          html = `
+            <table class="w-full text-left border border-gray-600 mt-4">
+              <thead>
+                <tr class="bg-gray-800">
+                  <th class="p-2 border border-gray-700">Date</th>
+                  <th class="p-2 border border-gray-700">Product</th>
+                  <th class="p-2 border border-gray-700">Debit</th>
+                  <th class="p-2 border border-gray-700">For</th>
+                  <th class="p-2 border border-gray-700">Quantity</th>
+                  <th class="p-2 border border-gray-700">By</th>
+                  <th class="p-2 border border-gray-700">From</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${result.data.map(row => `
+                  <tr>
+                    <td class="p-2 border border-gray-700">${row[1] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[5] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[4] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[6] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[7] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[8] || ""}</td>
+                    <td class="p-2 border border-gray-700">${row[9] || ""}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+            <p class="mt-4 font-bold text-green-400">Total Debit: ${result.totalDebit}</p>
+          `;
+        } else {
+          html = "<p class='mt-4 text-red-400'>No records found</p>";
+        }
+
+        document.getElementById("searchResults").innerHTML = html;
+
+      } catch (err) {
+        console.error("❌ Search error:", err);
+        alert("Error fetching search results!");
+      }
+    }
   </script>
 </body>
 </html>
