@@ -139,12 +139,13 @@ function renderDailyTable(rows) {
   document.getElementById("dailyData").innerHTML = html;
 }
 
-// ✅ Offline + Online Search
+// ✅ Search (Online + Offline)
 async function searchProduct() {
   const query = document.getElementById("searchInput").value.trim().toLowerCase();
   const startDate = document.getElementById("startDate").value;
   const endDate = document.getElementById("endDate").value;
 
+  // 📴 OFFLINE MODE
   if (!navigator.onLine) {
     console.warn("📴 Offline search running on cache");
     const cache = JSON.parse(localStorage.getItem("entriesCache") || "[]");
@@ -155,7 +156,7 @@ async function searchProduct() {
       const end = new Date(endDate);
       filtered = filtered.filter(r => {
         try {
-          const rowDate = new Date(r[1]);
+          const rowDate = new Date(r[1]); // formatted date string
           return rowDate >= start && rowDate <= end;
         } catch {
           return false;
@@ -167,6 +168,7 @@ async function searchProduct() {
     return;
   }
 
+  // 🌐 ONLINE MODE
   let url = `/.netlify/functions/addExpense?search=${encodeURIComponent(query)}`;
   if (startDate && endDate) {
     url += `&startDate=${startDate}&endDate=${endDate}`;
@@ -176,8 +178,11 @@ async function searchProduct() {
     const res = await fetch(url);
     const result = await res.json();
 
+    // 🔹 Save all results to cache
     if (result.data) {
-      localStorage.setItem("entriesCache", JSON.stringify(result.data));
+      let cache = JSON.parse(localStorage.getItem("entriesCache") || "[]");
+      cache = cache.concat(result.data);
+      localStorage.setItem("entriesCache", JSON.stringify(cache));
     }
 
     renderSearchResults(result);
@@ -186,7 +191,7 @@ async function searchProduct() {
   }
 }
 
-// ✅ Render search results
+// ✅ Render Search Results
 function renderSearchResults(result) {
   let html = "";
   if (result.data && result.data.length > 0) {
