@@ -13,11 +13,11 @@ exports.handler = async (event) => {
     const year = new Date().getFullYear().toString();
 
     // ✅ Return ALL entries for cache
-    if (event.queryStringParameters && event.queryStringParameters.all === "true") {
+    if (event.queryStringParameters?.all === "true") {
       const res = await sheets.spreadsheets.values.get({
         auth: client,
         spreadsheetId,
-        range: `${year}!A:Z`,
+        range: `${year}!A:J`,
       });
 
       return {
@@ -27,16 +27,16 @@ exports.handler = async (event) => {
     }
 
     // ✅ Return DAILY entries
-    if (event.queryStringParameters && event.queryStringParameters.daily === "true") {
-      const date = event.queryStringParameters.date;
+    if (event.queryStringParameters?.daily === "true") {
+      const date = formatDate(event.queryStringParameters.date);
       const res = await sheets.spreadsheets.values.get({
         auth: client,
         spreadsheetId,
-        range: `${year}!A:Z`,
+        range: `${year}!A:J`,
       });
 
       const rows = res.data.values || [];
-      const filtered = rows.filter(r => r[1] === formatDate(date)); // Column B = formatted date
+      const filtered = rows.filter(r => r[1] === date); // Col B = Date
       return {
         statusCode: 200,
         body: JSON.stringify({ data: filtered }),
@@ -44,7 +44,7 @@ exports.handler = async (event) => {
     }
 
     // ✅ Return SEARCH entries
-    if (event.queryStringParameters && event.queryStringParameters.search !== undefined) {
+    if (event.queryStringParameters?.search !== undefined) {
       const query = event.queryStringParameters.search.toLowerCase();
       const startDate = event.queryStringParameters.startDate;
       const endDate = event.queryStringParameters.endDate;
@@ -52,23 +52,23 @@ exports.handler = async (event) => {
       const res = await sheets.spreadsheets.values.get({
         auth: client,
         spreadsheetId,
-        range: `${year}!A:Z`,
+        range: `${year}!A:J`,
       });
 
       let rows = res.data.values || [];
 
-      // 🔹 Filter by product name
+      // 🔹 Filter by product (Col E)
       if (query) {
-        rows = rows.filter(r => (r[5] || "").toLowerCase().includes(query)); // Column F = Product
+        rows = rows.filter(r => (r[4] || "").toLowerCase().includes(query));
       }
 
-      // 🔹 Filter by date range
+      // 🔹 Filter by date range (Col B)
       if (startDate && endDate) {
         const start = new Date(startDate);
         const end = new Date(endDate);
         rows = rows.filter(r => {
           try {
-            const rowDate = new Date(r[1]); // Column B = Date (formatted)
+            const rowDate = new Date(r[1]);
             return rowDate >= start && rowDate <= end;
           } catch {
             return false;
@@ -76,7 +76,7 @@ exports.handler = async (event) => {
         });
       }
 
-      const totalDebit = rows.reduce((sum, r) => sum + (parseFloat(r[4] || 0) || 0), 0);
+      const totalDebit = rows.reduce((sum, r) => sum + (parseFloat(r[3] || 0) || 0), 0);
 
       return {
         statusCode: 200,
@@ -87,27 +87,26 @@ exports.handler = async (event) => {
     // ✅ POST new entry
     if (event.httpMethod === "POST") {
       const body = JSON.parse(event.body);
-
       const dateObj = new Date(body.date);
       const formattedDate = formatDate(body.date);
 
       const row = [
-        dateObj.toLocaleDateString("en-GB", { weekday: "long" }), // Day
-        formattedDate,                                           // Date
-        "",                                                      // Credit (blank)
-        body.debit || "",                                        // Debit
-        body.product || "",                                      // Product
-        body.for || "",                                          // For
-        body.quantity || "",                                     // Quantity
-        body.by || "",                                           // By
-        body.from || "",                                         // From
-        new Date().toISOString()                                 // Timestamp
+        dateObj.toLocaleDateString("en-GB", { weekday: "long" }), // Col A: Day
+        formattedDate,                                           // Col B: Date
+        "",                                                      // Col C: Credit blank
+        body.debit || "",                                        // Col D: Debit
+        body.product || "",                                      // Col E: Product
+        body.for || "",                                          // Col F: For
+        body.quantity || "",                                     // Col G: Quantity
+        body.by || "",                                           // Col H: By
+        body.from || "",                                         // Col I: From
+        new Date().toISOString()                                 // Col J: Timestamp
       ];
 
       await sheets.spreadsheets.values.append({
         auth: client,
         spreadsheetId,
-        range: `${year}!A:Z`,
+        range: `${year}!A:J`,
         valueInputOption: "USER_ENTERED",
         requestBody: { values: [row] },
       });
@@ -125,7 +124,7 @@ exports.handler = async (event) => {
   }
 };
 
-// ✅ Helper function - format date "01-September-2025"
+// ✅ Helper - format date "01-September-2025"
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleDateString("en-GB", {
