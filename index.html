@@ -1,84 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Expense Entry</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    body { background:#000; color:#fff; }
+    .rgb-border{position:relative;border-radius:1rem;overflow:hidden;padding:2px}
+    .rgb-border::before{content:"";position:absolute;inset:-50%;
+      background:conic-gradient(red,orange,yellow,green,cyan,blue,violet,red);
+      animation:spin 5s linear infinite;z-index:0}
+    .rgb-border::after{content:"";position:absolute;inset:4px;background:#111;border-radius:.75rem;z-index:1}
+    .content{position:relative;z-index:2}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    input,button{background:#111;border:1px solid #444;color:#fff}
+    input:focus{outline:none;border-color:cyan;background:#1b1b1b}
+    button{background:linear-gradient(90deg,#ff00cc,#3333ff);font-weight:700}
+    button:hover{opacity:.9}
+  </style>
 </head>
-<body class="bg-black text-white flex flex-col md:flex-row items-start justify-center min-h-screen space-y-6 md:space-y-0 md:space-x-6 p-4">
+<body class="min-h-screen p-4 md:p-8">
+  <!-- Expense Entry -->
+  <div class="rgb-border max-w-5xl mx-auto mb-8">
+    <div class="content p-6 md:p-8">
+      <h2 class="text-2xl md:text-3xl font-bold text-center mb-6">Expense Entry</h2>
 
-  <!-- Left: Expense Entry + Search -->
-  <div class="flex flex-col space-y-6 w-full md:w-1/2">
+      <form id="dataForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input type="date" id="dateInput" name="date" required class="px-3 py-2 rounded-lg md:col-span-2"/>
 
-    <!-- Expense Entry -->
-    <div class="rgb-border w-full rounded-2xl">
-      <div class="content p-6 sm:p-8">
-        <h2 class="text-xl sm:text-2xl font-bold text-center mb-6">Expense Entry</h2>
-        <form id="dataForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <input type="date" id="dateInput" name="date" required class="px-3 py-2 rounded-lg sm:col-span-2">
-          <input type="text" name="debit" placeholder="Debit" required class="px-3 py-2 rounded-lg">
-          <input type="text" name="product" placeholder="Product" required list="productList" class="px-3 py-2 rounded-lg">
-          <datalist id="productList"></datalist>
-          <input type="text" name="for" placeholder="For" required list="forList" class="px-3 py-2 rounded-lg">
-          <datalist id="forList"></datalist>
-          <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 rounded-lg">
-          <input type="text" name="by" placeholder="By" list="byList" class="px-3 py-2 rounded-lg">
-          <datalist id="byList"></datalist>
-          <input type="text" name="from" placeholder="From" list="fromList" class="px-3 py-2 rounded-lg sm:col-span-2">
-          <datalist id="fromList"></datalist>
-          <button type="submit" class="sm:col-span-2 py-2 rounded-lg">Submit</button>
-        </form>
-      </div>
-    </div>
+        <input type="text" name="debit" placeholder="Debit" required class="px-3 py-2 rounded-lg"/>
+        <input type="text" name="product" placeholder="Product" required class="px-3 py-2 rounded-lg"/>
 
-    <!-- Search -->
-    <div class="rgb-border w-full rounded-2xl">
-      <div class="content p-6 sm:p-8">
-        <h2 class="text-xl sm:text-2xl font-bold text-center mb-6">Search Expenses</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
-          <input type="text" id="searchInput" placeholder="Search by Product" class="px-3 py-2 rounded-lg">
-          <input type="date" id="startDate" class="px-3 py-2 rounded-lg">
-          <input type="date" id="endDate" class="px-3 py-2 rounded-lg">
-        </div>
-        <button onclick="searchProduct()" class="w-full px-4 py-2 rounded-lg">Search</button>
-        <div id="searchResults" class="mt-6 overflow-x-auto"></div>
-      </div>
+        <input type="text" name="for" placeholder="For" required class="px-3 py-2 rounded-lg"/>
+        <input type="text" name="quantity" placeholder="Quantity" class="px-3 py-2 rounded-lg"/>
+
+        <input type="text" name="by" placeholder="By" class="px-3 py-2 rounded-lg"/>
+        <input type="text" name="from" placeholder="From" class="px-3 py-2 rounded-lg md:col-span-1"/>
+
+        <button type="submit" class="md:col-span-2 px-4 py-2 rounded-lg">Submit</button>
+      </form>
     </div>
   </div>
 
-  <!-- Right: Daily Data -->
-  <div class="rgb-border w-full md:w-1/2 rounded-2xl">
-    <div class="content p-6 sm:p-8">
-      <h2 class="text-xl sm:text-2xl font-bold text-center mb-6">Today's Expenses</h2>
-      <div id="dailyData" class="overflow-x-auto"></div>
+  <!-- Today's Expenses -->
+  <div class="rgb-border max-w-5xl mx-auto mb-8">
+    <div class="content p-6 md:p-8">
+      <h2 class="text-2xl md:text-3xl font-bold text-center mb-4">Today's Expenses</h2>
+      <div id="dailyData" class="text-sm"></div>
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <!-- Search Expenses -->
+  <div class="rgb-border max-w-5xl mx-auto">
+    <div class="content p-6 md:p-8">
+      <h2 class="text-2xl md:text-3xl font-bold text-center mb-4">Search Expenses</h2>
 
-  <!-- Service Worker Register -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <input id="searchInput" type="text" placeholder="Search by Product" class="px-3 py-2 rounded-lg"/>
+        <input id="startDate" type="date" class="px-3 py-2 rounded-lg"/>
+        <input id="endDate" type="date" class="px-3 py-2 rounded-lg"/>
+      </div>
+      <div class="mt-3">
+        <button id="searchBtn" class="px-4 py-2 rounded-lg">Search</button>
+      </div>
+
+      <div id="searchResults" class="mt-4 text-sm text-red-400">No records found</div>
+    </div>
+  </div>
+
+  <script>
+    // page hooks
+    document.addEventListener('DOMContentLoaded', () => {
+      const d = document.getElementById('dateInput');
+      if (d && !d.value) d.value = new Date().toISOString().split('T')[0];
+
+      document.getElementById('searchBtn').addEventListener('click', () => window.searchProduct());
+      document.getElementById('searchInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); window.searchProduct(); }
+      });
+    });
+  </script>
+
+  <script src="./script.js"></script>
+
+  <!-- service worker register (optional) -->
   <script>
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/service-worker.js").then((reg) => {
-        reg.onupdatefound = () => {
-          const newWorker = reg.installing;
-          newWorker.onstatechange = () => {
-            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              window.location.reload();
-            }
-          };
-        };
-      });
+      navigator.serviceWorker.register("/service-worker.js")
+        .then(reg => { try{reg.update()}catch{}; console.log("SW ok"); })
+        .catch(err => console.warn("SW fail", err));
     }
-
-    // Auto-fill today's date
-    window.addEventListener("load", () => {
-      const today = new Date().toISOString().split("T")[0];
-      document.getElementById("dateInput").value = today;
-      loadDailyData(today);
-    });
   </script>
 </body>
 </html>
