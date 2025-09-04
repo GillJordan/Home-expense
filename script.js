@@ -35,6 +35,7 @@ document.getElementById("dataForm")?.addEventListener("submit", async function (
 });
 
 // ---- Daily panel ----
+// Column mapping (A–M): 0 Day | 1 Date | 2 Credit | 3 LeftBal | 4 Debit | 5 Product | 6 For | 7 Qty | 8 By | 9 From
 async function loadDailyData(dateISO) {
   const box = document.getElementById("dailyData");
   try {
@@ -50,17 +51,19 @@ async function loadDailyData(dateISO) {
 
     let total = 0;
     const body = rows.map(r => {
-      const debit = parseFloat(r[3] || 0) || 0; total += debit;
+      const debit = parseFloat(r[4] || 0) || 0; // E = Debit
+      total += debit;
       return `
         <tr>
-          <td class="p-2 border border-gray-700">${r[1] || ""}</td>
-          <td class="p-2 border border-gray-700">${r[4] || ""}</td>
-          <td class="p-2 border border-gray-700">${r[3] || ""}</td>
-          <td class="p-2 border border-gray-700">${r[5] || ""}</td>
-          <td class="p-2 border border-gray-700">${r[6] || ""}</td>
-          <td class="p-2 border border-gray-700">${r[7] || ""}</td>
-          <td class="p-2 border border-gray-700">${r[8] || ""}</td>
-        </tr>`;
+          <td class="p-2 border border-gray-700">${r[1] || ""}</td>  <!-- B Date -->
+          <td class="p-2 border border-gray-700">${r[5] || ""}</td>  <!-- F Product -->
+          <td class="p-2 border border-gray-700">${r[4] || ""}</td>  <!-- E Debit -->
+          <td class="p-2 border border-gray-700">${r[6] || ""}</td>  <!-- G For -->
+          <td class="p-2 border border-gray-700">${r[7] || ""}</td>  <!-- H Qty -->
+          <td class="p-2 border border-gray-700">${r[8] || ""}</td>  <!-- I By -->
+          <td class="p-2 border border-gray-700">${r[9] || ""}</td>  <!-- J From -->
+        </tr>
+      `;
     }).join("");
 
     box.innerHTML = `
@@ -106,15 +109,17 @@ window.searchProduct = async function () {
       return;
     }
 
+    const total = rows.reduce((sum, r) => sum + (parseFloat(r[4] || 0) || 0), 0); // E = Debit
+
     const body = rows.map(r => `
       <tr>
-        <td class="p-2 border border-gray-700">${r[1] || ""}</td>
-        <td class="p-2 border border-gray-700">${r[4] || ""}</td>
-        <td class="p-2 border border-gray-700">${r[3] || ""}</td>
-        <td class="p-2 border border-gray-700">${r[5] || ""}</td>
-        <td class="p-2 border border-gray-700">${r[6] || ""}</td>
-        <td class="p-2 border border-gray-700">${r[7] || ""}</td>
-        <td class="p-2 border border-gray-700">${r[8] || ""}</td>
+        <td class="p-2 border border-gray-700">${r[1] || ""}</td>  <!-- B Date -->
+        <td class="p-2 border border-gray-700">${r[5] || ""}</td>  <!-- F Product -->
+        <td class="p-2 border border-gray-700">${r[4] || ""}</td>  <!-- E Debit -->
+        <td class="p-2 border border-gray-700">${r[6] || ""}</td>  <!-- G For -->
+        <td class="p-2 border border-gray-700">${r[7] || ""}</td>  <!-- H Qty -->
+        <td class="p-2 border border-gray-700">${r[8] || ""}</td>  <!-- I By -->
+        <td class="p-2 border border-gray-700">${r[9] || ""}</td>  <!-- J From -->
       </tr>
     `).join("");
 
@@ -133,7 +138,7 @@ window.searchProduct = async function () {
         </thead>
         <tbody>${body}</tbody>
       </table>
-      <p class="mt-3 font-bold text-green-400">Total Debit: ${json.totalDebit || 0}</p>
+      <p class="mt-3 font-bold text-green-400">Total Debit: ${total}</p>
     `;
   } catch (err) {
     target.innerHTML = `<p class="text-red-400">Error: ${err.message}</p>`;
