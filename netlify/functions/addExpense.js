@@ -1,6 +1,6 @@
 const { google } = require("googleapis");
 
-/* ---------- Helpers ---------- */
+/* ---------- helpers ---------- */
 function noCache() {
   return {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -9,170 +9,157 @@ function noCache() {
     "Content-Type": "application/json"
   };
 }
-function resOk(obj)     { return { statusCode: 200, headers: noCache(), body: JSON.stringify(obj) }; }
-function resErr(code,e) { return { statusCode: code, headers: noCache(), body: JSON.stringify({ error: e }) }; }
+const ok  = (o) => ({ statusCode: 200, headers: noCache(), body: JSON.stringify(o) });
+const err = (c,e) => ({ statusCode: c,   headers: noCache(), body: JSON.stringify({ error: e }) });
 
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+function formatDate(dStr){
+  const d = new Date(dStr);
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }); // e.g. 04 September 2025
 }
 
-// ---- Parse service key (raw JSON OR base64(JSON)) + normalize private_key ----
-function parseServiceKey(raw) {
-  if (!raw) return null;
-  let json = null;
-  try { json = JSON.parse(raw); } catch (_) {
-    try { json = JSON.parse(Buffer.from(raw, "base64").toString("utf8")); } catch (_) { }
+// accept GOOGLE_SERVICE_KEY as raw JSON or base64(JSON), and normalize private_key
+function parseServiceKey(raw){
+  if(!raw) return null;
+  let json=null;
+  try{ json = JSON.parse(raw); }catch(_){
+    try{ json = JSON.parse(Buffer.from(raw, "base64").toString("utf8")); }catch(_){}
   }
-  if (!json) return null;
-
-  // Normalize the private key so OpenSSL can parse it:
-  // - If the value has literal "\n", convert to real newlines
-  // - Remove any stray quotes/spaces around the PEM
-  if (json.private_key) {
+  if(!json) return null;
+  if(json.private_key){
     let pk = json.private_key.trim();
-    // if contains "\n" sequences, turn them into real newlines
-    if (pk.includes("\\n")) pk = pk.replace(/\\n/g, "\n");
-    // ensure proper PEM guards are intact
-    if (!pk.includes("BEGIN PRIVATE KEY")) {
-      // nothing else we can do; keep as is
-    }
+    if(pk.includes("\\n")) pk = pk.replace(/\\n/g, "\n");
     json.private_key = pk;
   }
   return json;
 }
 
-async function getSheetsClient() {
+async function sheetsClient(){
   const creds = parseServiceKey(process.env.GOOGLE_SERVICE_KEY);
-  if (!creds) throw new Error("GOOGLE_SERVICE_KEY not parsable (raw JSON or base64).");
-
+  if(!creds) throw new Error("GOOGLE_SERVICE_KEY not parsable (raw JSON or base64).");
   const auth = new google.auth.GoogleAuth({
     credentials: creds,
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
   const client = await auth.getClient();
-  return { sheets: google.sheets({ version: "v4", auth: client }) };
+  return google.sheets({ version: "v4", auth: client });
 }
 
-async function ensureYearSheet({ sheets, spreadsheetId, year }) {
+// create header exactly like your sheet (A–M)
+async function ensureYearSheet({ sheets, spreadsheetId, year }){
   const meta = await sheets.spreadsheets.get({ spreadsheetId });
   const has = meta.data.sheets?.find(s => s.properties?.title === year);
-  if (has) return;
+  if(has) return;
 
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
-    requestBody: { requests: [{ addSheet: { properties: { title: year } } }] }
+    requestBody:{ requests:[{ addSheet:{ properties:{ title: year } } }] }
   });
 
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `${year}!A1:J1`,
+    range: `${year}!A1:M1`,
     valueInputOption: "RAW",
-    requestBody: { values: [[
-      "Day","Date","Credit","Debit","Product","For","Quantity","By","From","Timestamp"
-    ]] }
+    requestBody: {
+      values: [[
+        "Day","Date","Credit","Left Balance","Debit","Product","For","Quantity","By","From","Extra Spent","Daily Limit","Remaining Limit"
+      ]]
+    }
   });
 }
 
-/* ---------- MAIN HANDLER ---------- */
-exports.handler = async (event) => {
-  try {
+exports.handler = async (event)=>{
+  try{
     const spreadsheetId = process.env.SHEET_ID;
-    if (!spreadsheetId) return resErr(500, "SHEET_ID missing");
+    if(!spreadsheetId) return err(500,"SHEET_ID missing");
 
-    // Health
-    if (event.queryStringParameters?.health === "1") {
-      return resOk({ ok: true, msg: "function alive", method: event.httpMethod });
+    // health+diag
+    if(event.queryStringParameters?.health === "1"){
+      return ok({ ok:true, msg:"function alive", method:event.httpMethod });
     }
-
-    // Diagnostics
-    if (event.queryStringParameters?.diag === "1") {
-      try {
-        const { sheets } = await getSheetsClient();
+    if(event.queryStringParameters?.diag === "1"){
+      try{
+        const sheets = await sheetsClient();
         const meta = await sheets.spreadsheets.get({ spreadsheetId });
-        const titles = (meta.data.sheets || []).map(s => s.properties?.title);
-        return resOk({ ok: true, sheetId: spreadsheetId, tabs: titles });
-      } catch (e) {
-        return resErr(500, "Auth/Sheet error: " + (e.message || e.toString()));
-      }
+        const tabs = (meta.data.sheets||[]).map(s=>s.properties?.title);
+        return ok({ ok:true, sheetId: spreadsheetId, tabs });
+      }catch(e){ return err(500, "Auth/Sheet error: "+ (e.message||e.toString())); }
     }
 
-    const { sheets } = await getSheetsClient();
-    const now = new Date();
-    const year = now.getFullYear().toString();
+    const sheets = await sheetsClient();
+    const year = new Date().getFullYear().toString();
+    await ensureYearSheet({ sheets, spreadsheetId, year });
 
-    // ALL
-    if (event.queryStringParameters?.all === "true") {
-      await ensureYearSheet({ sheets, spreadsheetId, year });
-      const get = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${year}!A:J` });
-      return resOk({ data: get.data.values || [] });
+    // get all (for debug)
+    if(event.queryStringParameters?.all === "true"){
+      const get = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${year}!A:M`});
+      return ok({ data: get.data.values || [] });
     }
 
-    // DAILY
-    if (event.queryStringParameters?.daily === "true") {
+    // daily panel (Date is column B index 1)
+    if(event.queryStringParameters?.daily === "true"){
       const iso = event.queryStringParameters.date;
-      if (!iso) return resErr(400, "daily=true needs ?date=YYYY-MM-DD");
-      await ensureYearSheet({ sheets, spreadsheetId, year });
+      if(!iso) return err(400,"daily=true needs ?date=YYYY-MM-DD");
       const target = formatDate(iso);
-      const get = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${year}!A:J` });
-      const rows = (get.data.values || []).filter((r, i) => i !== 0 && r[1] === target);
-      return resOk({ data: rows });
+      const get = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${year}!A:M`});
+      const rows = (get.data.values||[]).filter((r,i)=> i!==0 && r[1] === target);
+      return ok({ data: rows });
     }
 
-    // SEARCH
-    if (event.queryStringParameters?.search !== undefined) {
+    // search panel — map to your columns
+    if(event.queryStringParameters?.search !== undefined){
       const q = (event.queryStringParameters.search || "").toLowerCase();
       const { startDate, endDate } = event.queryStringParameters;
-      await ensureYearSheet({ sheets, spreadsheetId, year });
+      const get = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${year}!A:M`});
+      let rows = (get.data.values||[]).slice(1); // skip header
 
-      const get = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${year}!A:J` });
-      let rows = (get.data.values || []).slice(1);
-      if (q) rows = rows.filter(r => (r[4] || "").toLowerCase().includes(q)); // E=Product
-      if (startDate && endDate) {
+      // E=Debit(index 4), F=Product(5)
+      if(q) rows = rows.filter(r => (r[5] || "").toLowerCase().includes(q));
+      if(startDate && endDate){
         const S = new Date(startDate), E = new Date(endDate);
-        rows = rows.filter(r => { try { const d = new Date(r[1]); return d >= S && d <= E; } catch { return false; } });
+        rows = rows.filter(r => { try{ const d=new Date(r[1]); return d>=S && d<=E; }catch{ return false; }});
       }
-      const totalDebit = rows.reduce((s, r) => s + (parseFloat(r[3] || 0) || 0), 0);
-      return resOk({ data: rows, totalDebit });
+      const totalDebit = rows.reduce((s,r)=> s + (parseFloat(r[4]||0)||0), 0);
+      return ok({ data: rows, totalDebit });
     }
 
-    // POST
-    if (event.httpMethod === "POST") {
-      let body = null;
-      try { body = JSON.parse(event.body || "{}"); } catch {}
-      if (!body || !body.date) return resErr(400, "Body must include at least { date }");
+    // add row (mapping A–M)
+    if(event.httpMethod === "POST"){
+      let body=null; try{ body = JSON.parse(event.body||"{}"); }catch{}
+      if(!body || !body.date) return err(400,"Body must include at least { date }");
 
-      await ensureYearSheet({ sheets, spreadsheetId, year });
+      const d = new Date(body.date);
+      if(isNaN(d)) return err(400,"Invalid date");
 
-      const dateObj = new Date(body.date);
-      if (isNaN(dateObj)) return resErr(400, "Invalid date");
-
-      const row = [
-        dateObj.toLocaleDateString("en-GB", { weekday: "long" }),
+      // A Day | B Date | C Credit | D LeftBal | E Debit | F Product | G For | H Qty | I By | J From | K Extra | L DL | M RL
+      const values = [[
+        d.toLocaleDateString("en-GB",{ weekday:"long" }),
         formatDate(body.date),
-        "",
-        body.debit || "",
-        body.product || "",
-        body.for || "",
-        body.quantity || "",
-        body.by || "",
-        body.from || "",
-        new Date().toISOString()
-      ];
+        "",                 // C Credit (blank)
+        "",                 // D Left Balance (blank - formula)
+        body.debit || "",   // E Debit
+        body.product || "", // F Product
+        body.for || "",     // G For
+        body.quantity || "",// H Quantity
+        body.by || "",      // I By
+        body.from || "",    // J From
+        "",                 // K Extra Spent (blank - formula/manual)
+        "",                 // L Daily Limit (blank - formula)
+        ""                  // M Remaining Limit (blank - formula)
+      ]];
 
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: `${year}!A:J`,
+        range: `${year}!A:M`,
         valueInputOption: "USER_ENTERED",
-        requestBody: { values: [row] }
+        requestBody: { values }
       });
 
-      return resOk({ message: "Row added", row });
+      return ok({ message:"Row added", row: values[0] });
     }
 
-    return resErr(405, "Method Not Allowed");
-  } catch (err) {
-    console.error("❌ Handler error:", err);
-    return resErr(500, err.message || "Unknown error");
+    return err(405,"Method Not Allowed");
+  }catch(e){
+    console.error("handler error:", e);
+    return err(500, e.message || "Unknown error");
   }
 };
