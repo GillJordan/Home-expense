@@ -1,6 +1,6 @@
 const { google } = require("googleapis");
 
-/* ---------- Small helpers ---------- */
+/* ---------- Helpers ---------- */
 function noCache() {
   return {
     "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
@@ -17,12 +17,14 @@ function formatDate(dateStr) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-// Some folks save the service key as base64 to avoid newline issues.
-// This parses either raw JSON or base64(JSON).
+// ---- Parse service key (raw JSON OR base64(JSON)) ----
 function parseServiceKey(raw) {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch (_) {}
-  try { return JSON.parse(Buffer.from(raw, "base64").toString("utf8")); } catch (_) {}
+  try {
+    const decoded = Buffer.from(raw, "base64").toString("utf8");
+    return JSON.parse(decoded);
+  } catch (_) {}
   return null;
 }
 
@@ -43,11 +45,13 @@ async function ensureYearSheet({ sheets, spreadsheetId, year }) {
   const has = meta.data.sheets?.find(s => s.properties?.title === year);
   if (has) return;
 
+  // create sheet if missing
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: { requests: [{ addSheet: { properties: { title: year } } }] }
   });
 
+  // set header row
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${year}!A1:J1`,
@@ -64,16 +68,13 @@ exports.handler = async (event) => {
     const spreadsheetId = process.env.SHEET_ID;
     if (!spreadsheetId) return resErr(500, "SHEET_ID missing");
 
-    // 0) Health: quick ping
+    // Health check
     if (event.queryStringParameters?.health === "1") {
       return resOk({ ok: true, msg: "function alive", method: event.httpMethod });
     }
 
-    // 1) Diagnostics: check env + auth + sheet visibility
+    // Diagnostics
     if (event.queryStringParameters?.diag === "1") {
-      const hasKey = !!process.env.GOOGLE_SERVICE_KEY;
-      if (!hasKey) return resErr(500, "GOOGLE_SERVICE_KEY missing");
-
       try {
         const { sheets } = await getSheetsClient();
         const meta = await sheets.spreadsheets.get({ spreadsheetId });
@@ -84,19 +85,18 @@ exports.handler = async (event) => {
       }
     }
 
-    // 2) Normal work
     const { sheets } = await getSheetsClient();
     const now = new Date();
     const year = now.getFullYear().toString();
 
-    // ALL
+    // ALL entries
     if (event.queryStringParameters?.all === "true") {
       await ensureYearSheet({ sheets, spreadsheetId, year });
       const get = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${year}!A:J` });
       return resOk({ data: get.data.values || [] });
     }
 
-    // DAILY
+    // DAILY entries
     if (event.queryStringParameters?.daily === "true") {
       const iso = event.queryStringParameters.date;
       if (!iso) return resErr(400, "daily=true needs ?date=YYYY-MM-DD");
@@ -120,14 +120,14 @@ exports.handler = async (event) => {
         const S = new Date(startDate), E = new Date(endDate);
         rows = rows.filter(r => { try { const d = new Date(r[1]); return d >= S && d <= E; } catch { return false; } });
       }
-      const totalDebit = rows.reduce((s, r) => s + (parseFloat(r[3] || 0) || 0), 0); // D=Debit
+      const totalDebit = rows.reduce((s, r) => s + (parseFloat(r[3] || 0) || 0), 0);
       return resOk({ data: rows, totalDebit });
     }
 
     // POST: add row
     if (event.httpMethod === "POST") {
       let body = null;
-      try { body = JSON.parse(event.body || "{}"); } catch { }
+      try { body = JSON.parse(event.body || "{}"); } catch {}
       if (!body || !body.date) return resErr(400, "Body must include at least { date }");
 
       await ensureYearSheet({ sheets, spreadsheetId, year });
