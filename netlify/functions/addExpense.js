@@ -17,15 +17,29 @@ function formatDate(dateStr) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-// ---- Parse service key (raw JSON OR base64(JSON)) ----
+// ---- Parse service key (raw JSON OR base64(JSON)) + normalize private_key ----
 function parseServiceKey(raw) {
   if (!raw) return null;
-  try { return JSON.parse(raw); } catch (_) {}
-  try {
-    const decoded = Buffer.from(raw, "base64").toString("utf8");
-    return JSON.parse(decoded);
-  } catch (_) {}
-  return null;
+  let json = null;
+  try { json = JSON.parse(raw); } catch (_) {
+    try { json = JSON.parse(Buffer.from(raw, "base64").toString("utf8")); } catch (_) { }
+  }
+  if (!json) return null;
+
+  // Normalize the private key so OpenSSL can parse it:
+  // - If the value has literal "\n", convert to real newlines
+  // - Remove any stray quotes/spaces around the PEM
+  if (json.private_key) {
+    let pk = json.private_key.trim();
+    // if contains "\n" sequences, turn them into real newlines
+    if (pk.includes("\\n")) pk = pk.replace(/\\n/g, "\n");
+    // ensure proper PEM guards are intact
+    if (!pk.includes("BEGIN PRIVATE KEY")) {
+      // nothing else we can do; keep as is
+    }
+    json.private_key = pk;
+  }
+  return json;
 }
 
 async function getSheetsClient() {
@@ -45,13 +59,11 @@ async function ensureYearSheet({ sheets, spreadsheetId, year }) {
   const has = meta.data.sheets?.find(s => s.properties?.title === year);
   if (has) return;
 
-  // create sheet if missing
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: { requests: [{ addSheet: { properties: { title: year } } }] }
   });
 
-  // set header row
   await sheets.spreadsheets.values.update({
     spreadsheetId,
     range: `${year}!A1:J1`,
@@ -68,7 +80,7 @@ exports.handler = async (event) => {
     const spreadsheetId = process.env.SHEET_ID;
     if (!spreadsheetId) return resErr(500, "SHEET_ID missing");
 
-    // Health check
+    // Health
     if (event.queryStringParameters?.health === "1") {
       return resOk({ ok: true, msg: "function alive", method: event.httpMethod });
     }
@@ -89,14 +101,14 @@ exports.handler = async (event) => {
     const now = new Date();
     const year = now.getFullYear().toString();
 
-    // ALL entries
+    // ALL
     if (event.queryStringParameters?.all === "true") {
       await ensureYearSheet({ sheets, spreadsheetId, year });
       const get = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${year}!A:J` });
       return resOk({ data: get.data.values || [] });
     }
 
-    // DAILY entries
+    // DAILY
     if (event.queryStringParameters?.daily === "true") {
       const iso = event.queryStringParameters.date;
       if (!iso) return resErr(400, "daily=true needs ?date=YYYY-MM-DD");
@@ -124,7 +136,7 @@ exports.handler = async (event) => {
       return resOk({ data: rows, totalDebit });
     }
 
-    // POST: add row
+    // POST
     if (event.httpMethod === "POST") {
       let body = null;
       try { body = JSON.parse(event.body || "{}"); } catch {}
@@ -136,16 +148,16 @@ exports.handler = async (event) => {
       if (isNaN(dateObj)) return resErr(400, "Invalid date");
 
       const row = [
-        dateObj.toLocaleDateString("en-GB", { weekday: "long" }), // A Day
-        formatDate(body.date),                                    // B Date
-        "",                                                       // C Credit
-        body.debit || "",                                         // D Debit
-        body.product || "",                                       // E Product
-        body.for || "",                                           // F For
-        body.quantity || "",                                      // G Quantity
-        body.by || "",                                            // H By
-        body.from || "",                                          // I From
-        new Date().toISOString()                                  // J Timestamp
+        dateObj.toLocaleDateString("en-GB", { weekday: "long" }),
+        formatDate(body.date),
+        "",
+        body.debit || "",
+        body.product || "",
+        body.for || "",
+        body.quantity || "",
+        body.by || "",
+        body.from || "",
+        new Date().toISOString()
       ];
 
       await sheets.spreadsheets.values.append({
